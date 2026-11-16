@@ -42,7 +42,7 @@ class QuickPopup(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.WindowCloseButtonHint
         )
-        self.setFixedWidth(380)
+        self.setFixedWidth(400)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
@@ -133,6 +133,10 @@ class QuickPopup(QWidget):
             self.tr_group.addButton(btn)
             self.tr_btns[tid] = btn
             tr_row.addWidget(btn)
+        btn_reset = QPushButton("Por defecto")
+        btn_reset.setToolTip("Restaurar Opacidad 90% y Desenfoque 10/15")
+        btn_reset.clicked.connect(lambda: self._exec("reset"))
+        tr_row.addWidget(btn_reset)
         root.addLayout(tr_row)
 
         self._op_timer = QTimer(self)

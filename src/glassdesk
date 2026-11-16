@@ -497,6 +497,12 @@ def apply_transparency(mode: str) -> None:
     apply_opacity(100 if mode == "reading" else 90)
 
 
+def apply_reset_visuals() -> None:
+    """Restore default crystal opacity (90%) and Better Blur DX strength (10)."""
+    apply_opacity(90)
+    apply_blur(10)
+
+
 def resolve_video_pool(is_vertical: bool) -> tuple[list[str], int, bool]:
     """Return (video_uris, fill_mode, fill_blur) based on monitor orientation and Vertical/ contents."""
     if is_vertical:
@@ -714,7 +720,7 @@ def step_wallpaper(delta: int) -> None:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|monitor|wallpaper|rotation>", file=sys.stderr)
+        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|reset|monitor|wallpaper|rotation>", file=sys.stderr)
         return 1
 
     cmd = argv[1]
@@ -734,6 +740,8 @@ def main(argv: list[str]) -> int:
         apply_opacity(int(arg))
     elif cmd == "blur":
         apply_blur(int(arg))
+    elif cmd == "reset":
+        apply_reset_visuals()
     elif cmd == "monitor":
         if arg != "all" and not arg.isdigit():
             raise SystemExit(f"Unknown monitor target: {arg}")
