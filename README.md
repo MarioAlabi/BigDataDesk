@@ -17,7 +17,7 @@ Configuración personal para **KDE Plasma 6 (Wayland)** con estética *frosted-g
 
 ## Qué incluye y cómo funciona
 
-* **Estética cristal + desenfoque real:** Configura **Darkly** + **Better Blur DX** (`BlurStrength=10`, `CornerRadius=8`) para dar efecto vidrio esmerilado a ventanas nativas de KDE, Dolphin, menús y paneles, con barras deslizantes en tiempo real para ajustar **Opacidad (`40%–100%`)** y **Desenfoque (`1–15`)**.
+* **Estética cristal + desenfoque real:** Configura **Darkly** + **Better Blur DX** (`BlurStrength=12`, `CornerRadius=8`) para dar efecto vidrio esmerilado a ventanas nativas de KDE, Dolphin, menús y paneles, con barras deslizantes en tiempo real para ajustar **Opacidad (`40%–100%`)** y **Desenfoque (`1–15`)**, más botón **Por defecto** y **Foco legible** (`diminactive` que atenúa ventanas inactivas de atrás mientras mantiene el texto activo nítido).
 * **Transparencia selectiva (`kwinrulesrc`):** Aplica opacidad (`90%` activa / `84%` inactiva) **solo** a apps nativas de KDE (`Dolphin`, `Preferencias del sistema`, `Konsole`, `Kate`, `Ark`, `KCalc`, `Okular`, `Spectacle`). Navegadores, reproductores y YouTube permanecen al `100%` opacos.
 * **9 temas + acentos sincronizados:** `Tokyo Night`, `Ethereal`, `Kanagawa`, `Nord`, `Catppuccin`, `Matte Black`, `Jade Horse`, `Everforest` y `Gruvbox`, sincronizados con **KDE Plasma**, **Ptyxis** y **Konsole**.
 * **Soporte multimonitor inteligente:** Detecta dinámicamente cuántas pantallas activas tienes (si solo hay 1, oculta el selector de monitores) y detecta orientación **horizontal vs vertical** (usando `Vertical/` si hay contenido, o aplicando ajuste con relleno desenfocado si no).

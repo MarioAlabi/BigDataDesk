@@ -134,7 +134,7 @@ class QuickPopup(QWidget):
             self.tr_btns[tid] = btn
             tr_row.addWidget(btn)
         btn_reset = QPushButton("Por defecto")
-        btn_reset.setToolTip("Restaurar Opacidad 90% y Desenfoque 10/15")
+        btn_reset.setToolTip("Restaurar Opacidad 90%, Desenfoque 12/15 y Foco legible")
         btn_reset.clicked.connect(lambda: self._exec("reset"))
         tr_row.addWidget(btn_reset)
         root.addLayout(tr_row)
@@ -177,7 +177,14 @@ class QuickPopup(QWidget):
         blur_row.addWidget(self.blur_val)
         root.addLayout(blur_row)
 
+        self.focus_check = QCheckBox("Foco legible (oscurece atrás, texto activo nítido)")
+        self.focus_check.toggled.connect(self._on_focus_toggled)
+        root.addWidget(self.focus_check)
+
         self._sync_ui()
+
+    def _on_focus_toggled(self, checked: bool) -> None:
+        self._exec("focus", "on" if checked else "off")
 
     def _on_opacity_changed(self, value: int) -> None:
         self.op_val.setText(f"{value}%")
@@ -248,12 +255,17 @@ class QuickPopup(QWidget):
             self.op_slider.blockSignals(False)
             self.op_val.setText(f"{op}%")
 
-        blur = max(1, min(15, int(st.get("blur", 10))))
+        blur = max(1, min(15, int(st.get("blur", 12))))
         if not self.blur_slider.isSliderDown():
             self.blur_slider.blockSignals(True)
             self.blur_slider.setValue(blur)
             self.blur_slider.blockSignals(False)
             self.blur_val.setText(f"{blur}/15")
+
+        focus_on = bool(st.get("focus", True))
+        self.focus_check.blockSignals(True)
+        self.focus_check.setChecked(focus_on)
+        self.focus_check.blockSignals(False)
 
         cur = str(st.get("current_file", "")).strip()
         self.file_label.setText(cur if cur else "—")

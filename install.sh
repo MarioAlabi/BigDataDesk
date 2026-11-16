@@ -363,9 +363,16 @@ EOF
     kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurMatching "false"
     kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurMenus "true"
     kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurNonMatching "true"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurStrength "10"
+    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurStrength "12"
     kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key CornerRadius "8"
     kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key NoiseStrength "2"
+    kwriteconfig6 --file kwinrc --group "Plugins" --key diminactiveEnabled "true"
+    kwriteconfig6 --file kwinrc --group "Effect-diminactive" --key Strength "38"
+    kwriteconfig6 --file kwinrc --group "Effect-diminactive" --key DimPanels "false"
+    kwriteconfig6 --file kwinrc --group "Effect-diminactive" --key DimDesktop "false"
+    kwriteconfig6 --file kwinrc --group "Effect-diminactive" --key DimKeepAbove "false"
+    kwriteconfig6 --file kwinrc --group "Effect-diminactive" --key DimByGroup "true"
+    kwriteconfig6 --file kwinrc --group "Effect-diminactive" --key DimFullScreen "false"
   fi
 
   if command -v flatpak >/dev/null 2>&1; then
@@ -399,19 +406,22 @@ EOF
   # Preservar estado previo en actualizaciones o inicializar valores por defecto
   local cur_theme="ethereal"
   local cur_opacity="90"
-  local cur_blur="10"
+  local cur_blur="12"
+  local cur_focus="on"
   local cur_icons="Neonyt-Dark-Icons"
   if [ -f "$STATE_DIR/state.json" ]; then
     cur_theme="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("theme","ethereal"))' "$STATE_DIR/state.json" 2>/dev/null || echo ethereal)"
     cur_opacity="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); t=d.get("transparency","glass"); print(d.get("opacity", 100 if t=="reading" else 90))' "$STATE_DIR/state.json" 2>/dev/null || echo 90)"
-    cur_blur="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("blur",10))' "$STATE_DIR/state.json" 2>/dev/null || echo 10)"
+    cur_blur="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("blur",12))' "$STATE_DIR/state.json" 2>/dev/null || echo 12)"
+    cur_focus="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("on" if d.get("focus", True) else "off")' "$STATE_DIR/state.json" 2>/dev/null || echo on)"
     cur_icons="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("icons","Neonyt-Dark-Icons"))' "$STATE_DIR/state.json" 2>/dev/null || echo Neonyt-Dark-Icons)"
   fi
 
-  log "Aplicando estado activo (tema=$cur_theme, opacidad=${cur_opacity}%, blur=$cur_blur)..."
+  log "Aplicando estado activo (tema=$cur_theme, opacidad=${cur_opacity}%, blur=$cur_blur, focus=$cur_focus)..."
   "$LOCAL_BIN/glassdesk" theme "$cur_theme" || true
-  "$LOCAL_BIN/glassdesk" opacity "$cur_opacity" || true
   "$LOCAL_BIN/glassdesk" blur "$cur_blur" || true
+  "$LOCAL_BIN/glassdesk" focus "$cur_focus" || true
+  "$LOCAL_BIN/glassdesk" opacity "$cur_opacity" || true
   if [ -d "$HOME/.local/share/icons/$cur_icons" ]; then
     "$LOCAL_BIN/glassdesk" icons "$cur_icons" || true
   fi

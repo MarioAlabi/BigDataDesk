@@ -296,8 +296,12 @@ def detect_status() -> dict[str, object]:
 
     apps_active = max(40, min(100, int(kread("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", "90"))))
     blur_strength = max(1, min(15, int(kread("kwinrc", "Effect-better_blur_dx", "BlurStrength", "10"))))
+    dim_cfg = kread("kwinrc", "Plugins", "diminactiveEnabled", "false").lower() == "true"
+    focus_on = bool(state.get("focus", dim_cfg))
+    ui_opacity = int(state.get("opacity", apps_active)) if focus_on else apps_active
+    ui_opacity = max(40, min(100, ui_opacity))
     icons = kread("kdeglobals", "Icons", "Theme", "Neonyt-Dark-Icons")
-    transparency_mode = "reading" if apps_active >= 100 else "glass"
+    transparency_mode = "reading" if ui_opacity >= 100 else "glass"
 
     screens = query_screens()
     monitor = target_monitor(screens)
@@ -318,8 +322,9 @@ def detect_status() -> dict[str, object]:
         "accent": accent_hex,
         "icons": icons,
         "transparency": transparency_mode,
-        "opacity": apps_active,
+        "opacity": ui_opacity,
         "blur": blur_strength,
+        "focus": focus_on,
         "wallpaper": wallpaper_mode,
         "monitor": monitor,
         "screen_count": len(screens),
@@ -441,11 +446,14 @@ def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int) -> None:
 def apply_opacity(pct: int) -> None:
     """Apply custom opacity percentage (40..100) across KDE rules, Darkly, Ptyxis, and Konsole."""
     pct = max(40, min(100, pct))
+    state = load_state()
+    focus_on = bool(state.get("focus", kread("kwinrc", "Plugins", "diminactiveEnabled", "false").lower() == "true"))
+
     if pct >= 100:
-        p = TRANSPARENCY_PROFILES["reading"]
+        p = dict(TRANSPARENCY_PROFILES["reading"])
         mode = "reading"
     elif pct == 90:
-        p = TRANSPARENCY_PROFILES["glass"]
+        p = dict(TRANSPARENCY_PROFILES["glass"])
         mode = "glass"
     else:
         p = {
@@ -458,6 +466,11 @@ def apply_opacity(pct: int) -> None:
             "bars": max(30, min(98, round(pct * 62 / 90.0))),
         }
         mode = "glass"
+
+    # When Focus mode is enabled, keep active foreground text crisp (98%) while dimming/fading background windows
+    if focus_on and pct < 100:
+        p["kde_active"] = 98
+        p["kde_inactive"] = max(35, pct - 14)
 
     schema = ptyxis_profile_schema()
     if schema:
@@ -481,6 +494,28 @@ def apply_opacity(pct: int) -> None:
     save_state({"transparency": mode, "opacity": pct})
 
 
+def apply_focus(enabled: bool) -> None:
+    """Toggle Dim Inactive + crisp active foreground text for readable stacked windows."""
+    qb = qdbus_bin()
+    if enabled:
+        kwrite("kwinrc", "Effect-diminactive", "Strength", "38")
+        kwrite("kwinrc", "Effect-diminactive", "DimPanels", "false")
+        kwrite("kwinrc", "Effect-diminactive", "DimDesktop", "false")
+        kwrite("kwinrc", "Effect-diminactive", "DimKeepAbove", "false")
+        kwrite("kwinrc", "Effect-diminactive", "DimByGroup", "true")
+        kwrite("kwinrc", "Effect-diminactive", "DimFullScreen", "false")
+        kwrite("kwinrc", "Plugins", "diminactiveEnabled", "true")
+        run([qb, "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.loadEffect", "diminactive"])
+        run([qb, "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", "diminactive"])
+    else:
+        kwrite("kwinrc", "Plugins", "diminactiveEnabled", "false")
+        run([qb, "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.unloadEffect", "diminactive"])
+
+    state = save_state({"focus": enabled})
+    cur_opacity = int(state.get("opacity", 90))
+    apply_opacity(cur_opacity)
+
+
 def apply_blur(strength: int) -> None:
     """Apply KWin Better Blur DX blur strength (1..15) and reload the effect immediately."""
     strength = max(1, min(15, strength))
@@ -498,9 +533,10 @@ def apply_transparency(mode: str) -> None:
 
 
 def apply_reset_visuals() -> None:
-    """Restore default crystal opacity (90%) and Better Blur DX strength (10)."""
-    apply_opacity(90)
-    apply_blur(10)
+    """Restore default crystal opacity (90%), blur strength (12), and readable focus mode."""
+    apply_blur(12)
+    save_state({"opacity": 90})
+    apply_focus(True)
 
 
 def resolve_video_pool(is_vertical: bool) -> tuple[list[str], int, bool]:
@@ -720,7 +756,7 @@ def step_wallpaper(delta: int) -> None:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|reset|monitor|wallpaper|rotation>", file=sys.stderr)
+        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|focus|reset|monitor|wallpaper|rotation>", file=sys.stderr)
         return 1
 
     cmd = argv[1]
@@ -740,6 +776,10 @@ def main(argv: list[str]) -> int:
         apply_opacity(int(arg))
     elif cmd == "blur":
         apply_blur(int(arg))
+    elif cmd == "focus":
+        if arg not in ("on", "off"):
+            raise SystemExit(f"Unknown focus flag: {arg}")
+        apply_focus(arg == "on")
     elif cmd == "reset":
         apply_reset_visuals()
     elif cmd == "monitor":
