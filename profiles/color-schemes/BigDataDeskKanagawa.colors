@@ -131,8 +131,8 @@ ForegroundPositive=118,148,106
 ForegroundVisited=149,127,184
 
 [General]
-ColorScheme=GlassDeskKanagawa
-Name=GlassDesk Kanagawa
+ColorScheme=BigDataDeskKanagawa
+Name=BigDataDesk Kanagawa
 shadeSortColumn=true
 
 [KDE]

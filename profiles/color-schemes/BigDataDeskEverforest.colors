@@ -131,8 +131,8 @@ ForegroundPositive=167,192,128
 ForegroundVisited=214,153,182
 
 [General]
-ColorScheme=GlassDeskEverforest
-Name=GlassDesk Everforest
+ColorScheme=BigDataDeskEverforest
+Name=BigDataDesk Everforest
 shadeSortColumn=true
 
 [KDE]

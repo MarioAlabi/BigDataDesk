@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compact floating GlassDesk controller that stays open across repeated clicks."""
+"""Compact floating BigDataDesk controller that stays open across repeated clicks."""
 
 from __future__ import annotations
 
@@ -80,18 +80,18 @@ class JumpSlider(QSlider):
             return
         super().mouseReleaseEvent(event)
 
-GLASSDESK_BIN = os.path.expanduser("~/.local/bin/glassdesk")
+BIGDATADESK_BIN = os.path.expanduser("~/.local/bin/bigdatadesk")
 
 
 def run_gd(*args: str) -> str:
-    res = subprocess.run([GLASSDESK_BIN, *args], capture_output=True, text=True)
+    res = subprocess.run([BIGDATADESK_BIN, *args], capture_output=True, text=True)
     return res.stdout.strip()
 
 
 class QuickPopup(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("GlassDesk — Control rápido")
+        self.setWindowTitle("BigDataDesk — Control rápido")
         self.setWindowIcon(QIcon.fromTheme("preferences-desktop-color"))
         self.setWindowFlags(
             Qt.WindowType.Window
@@ -356,7 +356,7 @@ class QuickPopup(QWidget):
 def main() -> int:
     app = QApplication(sys.argv)
 
-    server_name = "glassdesk-popup-instance"
+    server_name = "bigdatadesk-popup-instance"
     probe = QLocalSocket()
     probe.connectToServer(server_name)
     if probe.waitForConnected(150):

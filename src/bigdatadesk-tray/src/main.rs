@@ -53,7 +53,7 @@ struct DeskState {
     screen_count: usize,
 }
 
-struct GlassDeskTray {
+struct BigDataDeskTray {
     bin_path: String,
     popup_path: String,
     video_dir: String,
@@ -150,7 +150,7 @@ fn acquire_single_instance() -> Option<UnixListener> {
     let sock_dir = env::var("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("/tmp"));
-    let sock_path = sock_dir.join("glassdesk-tray.sock");
+    let sock_path = sock_dir.join("bigdatadesk-tray.sock");
 
     if UnixStream::connect(&sock_path).is_ok() {
         return None;
@@ -159,9 +159,9 @@ fn acquire_single_instance() -> Option<UnixListener> {
     UnixListener::bind(&sock_path).ok()
 }
 
-impl ksni::Tray for GlassDeskTray {
+impl ksni::Tray for BigDataDeskTray {
     fn id(&self) -> String {
-        "glassdesk-tray".into()
+        "bigdatadesk-tray".into()
     }
 
     fn icon_name(&self) -> String {
@@ -169,7 +169,7 @@ impl ksni::Tray for GlassDeskTray {
     }
 
     fn title(&self) -> String {
-        "GlassDesk".into()
+        "BigDataDesk".into()
     }
 
     fn activate(&mut self, _x: i32, _y: i32) {
@@ -189,7 +189,7 @@ impl ksni::Tray for GlassDeskTray {
             "Estáticos"
         };
         ksni::ToolTip {
-            title: "GlassDesk".into(),
+            title: "BigDataDesk".into(),
             description: format!("{} · {} · {}", theme_label, transp_label, wp_label),
             icon_name: "preferences-desktop-color".into(),
             icon_pixmap: vec![],
@@ -418,12 +418,12 @@ fn main() {
     };
 
     let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    let bin_path = format!("{}/.local/bin/glassdesk", home);
-    let popup_path = format!("{}/.local/bin/glassdesk-popup", home);
+    let bin_path = format!("{}/.local/bin/bigdatadesk", home);
+    let popup_path = format!("{}/.local/bin/bigdatadesk-popup", home);
     let video_dir = resolve_video_dir(&home);
     let state = query_state(&bin_path);
 
-    let tray = GlassDeskTray {
+    let tray = BigDataDeskTray {
         bin_path,
         popup_path,
         video_dir,

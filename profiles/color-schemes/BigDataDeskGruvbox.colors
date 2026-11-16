@@ -131,8 +131,8 @@ ForegroundPositive=169,182,101
 ForegroundVisited=211,134,155
 
 [General]
-ColorScheme=GlassDeskGruvbox
-Name=GlassDesk Gruvbox
+ColorScheme=BigDataDeskGruvbox
+Name=BigDataDesk Gruvbox
 shadeSortColumn=true
 
 [KDE]

@@ -131,8 +131,8 @@ ForegroundPositive=139,203,177
 ForegroundVisited=183,161,200
 
 [General]
-ColorScheme=GlassDeskJadeHorse
-Name=GlassDesk Jade Horse
+ColorScheme=BigDataDeskJadeHorse
+Name=BigDataDesk Jade Horse
 shadeSortColumn=true
 
 [KDE]

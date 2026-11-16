@@ -131,8 +131,8 @@ ForegroundPositive=158,206,106
 ForegroundVisited=187,154,247
 
 [General]
-ColorScheme=GlassDeskTokyoNight
-Name=GlassDesk Tokyo Night
+ColorScheme=BigDataDeskTokyoNight
+Name=BigDataDesk Tokyo Night
 shadeSortColumn=true
 
 [KDE]

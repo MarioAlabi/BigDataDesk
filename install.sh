@@ -3,7 +3,8 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_BIN="$HOME/.local/bin"
-STATE_DIR="$HOME/.config/glassdesk"
+STATE_DIR="$HOME/.config/bigdatadesk"
+LEGACY_STATE_DIR="$HOME/.config/glassdesk"
 BACKUP_DIR="$HOME/.local/share/bigdatadesk/backup-initial"
 MANIFEST_FILE="$STATE_DIR/install-manifest.json"
 PLUGINS_DIR="$HOME/.local/share/plasma/wallpapers"
@@ -24,14 +25,14 @@ for arg in "$@"; do
       cat <<EOF
 Uso: ./install.sh [OPCIONES]
 
-Instalador y actualizador idempotente de BigDataDesk (GlassDesk para KDE Plasma 6).
+Instalador y actualizador idempotente de BigDataDesk para KDE Plasma 6.
 Si ya está instalado, actualiza binarios, perfiles y reglas en su lugar sin duplicar entradas.
 
 Opciones:
   --update          Ejecuta 'git pull --ff-only' antes de actualizar la instalación
   --skip-deps       Omite la instalación de dependencias con dnf/pacman
   --refresh-icons   Re-descarga los paquetes de iconos Neonyt-Dark-Icons y Sweet-Red
-  --uninstall       Desinstala GlassDesk y opcionalmente restaura el respaldo inicial
+  --uninstall       Desinstala BigDataDesk y opcionalmente restaura el respaldo inicial
   -h, --help        Muestra esta ayuda
 EOF
       exit 0
@@ -76,22 +77,29 @@ resolve_video_dir() {
 }
 
 stop_running_services() {
+  systemctl --user stop glassdesk-tray-live.service 2>/dev/null || true
+  systemctl --user stop bigdatadesk-tray-live.service 2>/dev/null || true
   pkill -x glassdesk-tray 2>/dev/null || true
+  pkill -x bigdatadesk-tray 2>/dev/null || true
   pkill -f "/bin/glassdesk-popup$" 2>/dev/null || true
-  rm -f "${XDG_RUNTIME_DIR:-/tmp}/glassdesk-tray.sock"
+  pkill -f "/bin/bigdatadesk-popup$" 2>/dev/null || true
+  rm -f "${XDG_RUNTIME_DIR:-/tmp}/glassdesk-tray.sock" "${XDG_RUNTIME_DIR:-/tmp}/bigdatadesk-tray.sock"
   sleep 0.2
 }
 
-do_uninstall() {
-  log "Deteniendo procesos activos..."
-  stop_running_services
-
-  log "Eliminando binarios y autostart..."
+cleanup_legacy_identities() {
+  # Eliminar binarios, autostart y esquemas anteriores (GlassDesk / Omarchy) sin duplicar
   rm -f "$LOCAL_BIN/glassdesk" "$LOCAL_BIN/glassdesk-popup" "$LOCAL_BIN/glassdesk-tray"
   rm -f "$HOME/.config/autostart/glassdesk-tray.desktop"
-  rm -f "$HOME/.local/share/color-schemes/GlassDesk"*.colors
-  rm -f "$HOME/.local/share/org.gnome.Ptyxis/palettes/GlassDesk "*.palette
+  rm -f "$HOME/.local/share/color-schemes/Omarchy"*.colors "$HOME/.local/share/color-schemes/GlassDesk"*.colors
+  rm -f "$HOME/.local/share/org.gnome.Ptyxis/palettes/Omarchy "*.palette "$HOME/.local/share/org.gnome.Ptyxis/palettes/GlassDesk "*.palette
   rm -f "$HOME/.local/share/konsole/GlassDesk.profile" "$HOME/.local/share/konsole/GlassDesk.colorscheme"
+
+  if [ -d "$LEGACY_STATE_DIR" ] && [ -f "$LEGACY_STATE_DIR/state.json" ] && [ ! -f "$STATE_DIR/state.json" ]; then
+    mkdir -p "$STATE_DIR"
+    cp -f "$LEGACY_STATE_DIR/state.json" "$STATE_DIR/state.json"
+  fi
+  rm -rf "$LEGACY_STATE_DIR"
 
   if [ -f "$HOME/.config/kwinrulesrc" ]; then
     python3 - <<'PY'
@@ -100,11 +108,48 @@ path = os.path.expanduser("~/.config/kwinrulesrc")
 cp = configparser.ConfigParser(interpolation=None)
 cp.optionxform = str
 cp.read(path, encoding="utf-8")
+changed = False
 if cp.has_section("glassdesk-kde-apps"):
     cp.remove_section("glassdesk-kde-apps")
+    changed = True
 if cp.has_section("General"):
     raw = cp.get("General", "Order", fallback="") or cp.get("General", "rules", fallback="")
     rules = [r.strip() for r in raw.split(",") if r.strip() and r.strip() != "glassdesk-kde-apps"]
+    cp.set("General", "count", str(len(rules)))
+    cp.set("General", "rules", ",".join(rules))
+    cp.set("General", "Order", ",".join(rules))
+    changed = True
+if changed:
+    with open(path, "w", encoding="utf-8") as f:
+        cp.write(f, space_around_delimiters=False)
+PY
+  fi
+}
+
+do_uninstall() {
+  log "Deteniendo procesos activos..."
+  stop_running_services
+
+  log "Eliminando binarios y autostart..."
+  rm -f "$LOCAL_BIN/bigdatadesk" "$LOCAL_BIN/bigdatadesk-popup" "$LOCAL_BIN/bigdatadesk-tray"
+  rm -f "$HOME/.config/autostart/bigdatadesk-tray.desktop"
+  rm -f "$HOME/.local/share/color-schemes/BigDataDesk"*.colors
+  rm -f "$HOME/.local/share/org.gnome.Ptyxis/palettes/BigDataDesk "*.palette
+  rm -f "$HOME/.local/share/konsole/BigDataDesk.profile" "$HOME/.local/share/konsole/BigDataDesk.colorscheme"
+  cleanup_legacy_identities
+
+  if [ -f "$HOME/.config/kwinrulesrc" ]; then
+    python3 - <<'PY'
+import configparser, os
+path = os.path.expanduser("~/.config/kwinrulesrc")
+cp = configparser.ConfigParser(interpolation=None)
+cp.optionxform = str
+cp.read(path, encoding="utf-8")
+if cp.has_section("bigdatadesk-kde-apps"):
+    cp.remove_section("bigdatadesk-kde-apps")
+if cp.has_section("General"):
+    raw = cp.get("General", "Order", fallback="") or cp.get("General", "rules", fallback="")
+    rules = [r.strip() for r in raw.split(",") if r.strip() and r.strip() != "bigdatadesk-kde-apps"]
     cp.set("General", "count", str(len(rules)))
     cp.set("General", "rules", ",".join(rules))
     cp.set("General", "Order", ",".join(rules))
@@ -292,31 +337,32 @@ main() {
   backup_initial_once
   install_dependencies
 
-  log "Deteniendo instancias previas de GlassDesk (sin duplicados)..."
+  log "Deteniendo instancias previas de BigDataDesk (sin duplicados)..."
   stop_running_services
+  cleanup_legacy_identities
 
   log "Compilando e instalando binarios en $LOCAL_BIN..."
   mkdir -p "$LOCAL_BIN" "$STATE_DIR"
-  install -m 755 "$REPO_DIR/src/glassdesk" "$LOCAL_BIN/glassdesk"
-  install -m 755 "$REPO_DIR/src/glassdesk-popup" "$LOCAL_BIN/glassdesk-popup"
+  install -m 755 "$REPO_DIR/src/bigdatadesk" "$LOCAL_BIN/bigdatadesk"
+  install -m 755 "$REPO_DIR/src/bigdatadesk-popup" "$LOCAL_BIN/bigdatadesk-popup"
 
   if command -v cargo >/dev/null 2>&1; then
     cargo build --release \
-      --manifest-path "$REPO_DIR/src/glassdesk-tray/Cargo.toml" \
+      --manifest-path "$REPO_DIR/src/bigdatadesk-tray/Cargo.toml" \
       --target-dir "$HOME/.cache/bigdatadesk-target"
-    install -m 755 "$HOME/.cache/bigdatadesk-target/release/glassdesk-tray" "$LOCAL_BIN/glassdesk-tray"
+    install -m 755 "$HOME/.cache/bigdatadesk-target/release/bigdatadesk-tray" "$LOCAL_BIN/bigdatadesk-tray"
   else
-    warn "cargo no disponible; no se pudo compilar glassdesk-tray."
+    warn "cargo no disponible; no se pudo compilar bigdatadesk-tray."
   fi
 
-  log "Instalando autostart en $HOME/.config/autostart/glassdesk-tray.desktop..."
+  log "Instalando autostart en $HOME/.config/autostart/bigdatadesk-tray.desktop..."
   mkdir -p "$HOME/.config/autostart"
-  cat > "$HOME/.config/autostart/glassdesk-tray.desktop" <<EOF
+  cat > "$HOME/.config/autostart/bigdatadesk-tray.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=GlassDesk
+Name=BigDataDesk
 Comment=Selector rápido de temas, acentos, transparencia y fondos para KDE
-Exec=$LOCAL_BIN/glassdesk-tray
+Exec=$LOCAL_BIN/bigdatadesk-tray
 Icon=preferences-desktop-color
 Terminal=false
 Categories=Settings;DesktopSettings;
@@ -328,15 +374,12 @@ EOF
   mkdir -p "$HOME/.local/share/color-schemes" \
            "$HOME/.local/share/org.gnome.Ptyxis/palettes" \
            "$HOME/.local/share/konsole"
-  # Limpiar nombres heredados antiguos si es actualización desde versión previa
-  rm -f "$HOME/.local/share/color-schemes/Omarchy"*.colors
-  rm -f "$HOME/.local/share/org.gnome.Ptyxis/palettes/Omarchy "*.palette
   cp -f "$REPO_DIR/profiles/color-schemes/"*.colors "$HOME/.local/share/color-schemes/"
   cp -f "$REPO_DIR/profiles/ptyxis-palettes/"*.palette "$HOME/.local/share/org.gnome.Ptyxis/palettes/"
-  cp -f "$REPO_DIR/profiles/konsole/GlassDesk.profile" "$HOME/.local/share/konsole/"
-  cp -f "$REPO_DIR/profiles/konsole/GlassDesk.colorscheme" "$HOME/.local/share/konsole/"
+  cp -f "$REPO_DIR/profiles/konsole/BigDataDesk.profile" "$HOME/.local/share/konsole/"
+  cp -f "$REPO_DIR/profiles/konsole/BigDataDesk.colorscheme" "$HOME/.local/share/konsole/"
   if command -v kwriteconfig6 >/dev/null 2>&1; then
-    kwriteconfig6 --file konsolerc --group "Desktop Entry" --key DefaultProfile "GlassDesk.profile"
+    kwriteconfig6 --file konsolerc --group "Desktop Entry" --key DefaultProfile "BigDataDesk.profile"
   fi
 
   log "Aplicando configuración de Darkly, Better Blur DX y GTK..."
@@ -423,12 +466,12 @@ EOF
   fi
 
   log "Aplicando estado activo (tema=$cur_theme, opacidad=${cur_opacity}%, blur=$cur_blur, protect_text=$cur_protect)..."
-  "$LOCAL_BIN/glassdesk" theme "$cur_theme" || true
-  "$LOCAL_BIN/glassdesk" blur "$cur_blur" || true
-  "$LOCAL_BIN/glassdesk" protect-text "$cur_protect" || true
-  "$LOCAL_BIN/glassdesk" opacity "$cur_opacity" || true
+  "$LOCAL_BIN/bigdatadesk" theme "$cur_theme" || true
+  "$LOCAL_BIN/bigdatadesk" blur "$cur_blur" || true
+  "$LOCAL_BIN/bigdatadesk" protect-text "$cur_protect" || true
+  "$LOCAL_BIN/bigdatadesk" opacity "$cur_opacity" || true
   if [ -d "$HOME/.local/share/icons/$cur_icons" ]; then
-    "$LOCAL_BIN/glassdesk" icons "$cur_icons" || true
+    "$LOCAL_BIN/bigdatadesk" icons "$cur_icons" || true
   fi
 
   python3 - "$MANIFEST_FILE" "$REPO_DIR" <<'PY'
@@ -442,13 +485,13 @@ with open(manifest_path, "w", encoding="utf-8") as f:
     json.dump(data, f, indent=2)
 PY
 
-  if [ -x "$LOCAL_BIN/glassdesk-tray" ] && { [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; }; then
-    log "Iniciando glassdesk-tray en segundo plano..."
+  if [ -x "$LOCAL_BIN/bigdatadesk-tray" ] && { [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; }; then
+    log "Iniciando bigdatadesk-tray en segundo plano..."
     if command -v systemd-run >/dev/null 2>&1 && systemctl --user is-active default.target >/dev/null 2>&1; then
-      systemctl --user stop glassdesk-tray-live.service >/dev/null 2>&1 || true
-      systemd-run --user --quiet --collect --unit=glassdesk-tray-live "$LOCAL_BIN/glassdesk-tray"
+      systemctl --user stop bigdatadesk-tray-live.service >/dev/null 2>&1 || true
+      systemd-run --user --quiet --collect --unit=bigdatadesk-tray-live "$LOCAL_BIN/bigdatadesk-tray"
     else
-      nohup "$LOCAL_BIN/glassdesk-tray" </dev/null >/dev/null 2>&1 &
+      nohup "$LOCAL_BIN/bigdatadesk-tray" </dev/null >/dev/null 2>&1 &
     fi
   fi
 

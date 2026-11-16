@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GlassDesk — KDE Plasma theme, accent, transparency, and orientation-aware wallpaper controller."""
+"""BigDataDesk — KDE Plasma theme, accent, transparency, and orientation-aware wallpaper controller."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ import subprocess
 import sys
 import urllib.parse
 
-STATE_FILE = os.path.expanduser("~/.config/glassdesk/state.json")
+STATE_FILE = os.path.expanduser("~/.config/bigdatadesk/state.json")
 PALETTE_DIR = os.path.expanduser("~/.local/share/org.gnome.Ptyxis/palettes")
-KONSOLE_SCHEME = os.path.expanduser("~/.local/share/konsole/GlassDesk.colorscheme")
+KONSOLE_SCHEME = os.path.expanduser("~/.local/share/konsole/BigDataDesk.colorscheme")
 KWINRULES_FILE = os.path.expanduser("~/.config/kwinrulesrc")
 
 
@@ -45,64 +45,64 @@ STATIC_VERT_DIR = os.path.join(STATIC_DIR, "Vertical")
 THEMES: dict[str, dict[str, str]] = {
     "tokyo-night": {
         "label": "Tokyo Night",
-        "scheme": "GlassDeskTokyoNight",
-        "ptyxis": "GlassDesk Tokyo Night",
+        "scheme": "BigDataDeskTokyoNight",
+        "ptyxis": "BigDataDesk Tokyo Night",
         "accent": "#7aa2f7",
         "wallpaper_subdir": "tokyo-night",
     },
     "ethereal": {
         "label": "Ethereal",
-        "scheme": "GlassDeskEthereal",
-        "ptyxis": "GlassDesk Ethereal",
+        "scheme": "BigDataDeskEthereal",
+        "ptyxis": "BigDataDesk Ethereal",
         "accent": "#7d82d9",
         "wallpaper_subdir": "ethereal",
     },
     "kanagawa": {
         "label": "Kanagawa",
-        "scheme": "GlassDeskKanagawa",
-        "ptyxis": "GlassDesk Kanagawa",
+        "scheme": "BigDataDeskKanagawa",
+        "ptyxis": "BigDataDesk Kanagawa",
         "accent": "#7e9cd8",
         "wallpaper_subdir": "kanagawa",
     },
     "nord": {
         "label": "Nord",
-        "scheme": "GlassDeskNord",
-        "ptyxis": "GlassDesk Nord",
+        "scheme": "BigDataDeskNord",
+        "ptyxis": "BigDataDesk Nord",
         "accent": "#81a1c1",
         "wallpaper_subdir": "tokyo-night",
     },
     "catppuccin": {
         "label": "Catppuccin",
-        "scheme": "GlassDeskCatppuccin",
-        "ptyxis": "GlassDesk Catppuccin",
+        "scheme": "BigDataDeskCatppuccin",
+        "ptyxis": "BigDataDesk Catppuccin",
         "accent": "#89b4fa",
         "wallpaper_subdir": "catppuccin",
     },
     "matte-black": {
         "label": "Matte Black (Rojo)",
-        "scheme": "GlassDeskMatteBlack",
-        "ptyxis": "GlassDesk Matte Black",
+        "scheme": "BigDataDeskMatteBlack",
+        "ptyxis": "BigDataDesk Matte Black",
         "accent": "#ff1e38",
         "wallpaper_subdir": "starship",
     },
     "jade-horse": {
         "label": "Jade Horse",
-        "scheme": "GlassDeskJadeHorse",
-        "ptyxis": "GlassDesk Jade Horse",
+        "scheme": "BigDataDeskJadeHorse",
+        "ptyxis": "BigDataDesk Jade Horse",
         "accent": "#8bcbb1",
         "wallpaper_subdir": "starship",
     },
     "everforest": {
         "label": "Everforest",
-        "scheme": "GlassDeskEverforest",
-        "ptyxis": "GlassDesk Everforest",
+        "scheme": "BigDataDeskEverforest",
+        "ptyxis": "BigDataDesk Everforest",
         "accent": "#7fbbb3",
         "wallpaper_subdir": "starship",
     },
     "gruvbox": {
         "label": "Gruvbox",
-        "scheme": "GlassDeskGruvbox",
-        "ptyxis": "GlassDesk Gruvbox",
+        "scheme": "BigDataDeskGruvbox",
+        "ptyxis": "BigDataDesk Gruvbox",
         "accent": "#7daea3",
         "wallpaper_subdir": "starship",
     },
@@ -293,9 +293,15 @@ def rgb_csv_to_hex(csv_val: str, fallback: str) -> str:
 
 def detect_status() -> dict[str, object]:
     state = load_state()
-    scheme = kread("kdeglobals", "General", "ColorScheme", "GlassDeskEthereal")
+    scheme = kread("kdeglobals", "General", "ColorScheme", "BigDataDeskEthereal")
     theme_slug = next(
-        (k for k, v in THEMES.items() if v["scheme"] == scheme or v["scheme"].replace("GlassDesk", "Omarchy") == scheme),
+        (
+            k
+            for k, v in THEMES.items()
+            if v["scheme"] == scheme
+            or v["scheme"].replace("BigDataDesk", "GlassDesk") == scheme
+            or v["scheme"].replace("BigDataDesk", "Omarchy") == scheme
+        ),
         str(state.get("theme", "ethereal")),
     )
 
@@ -303,9 +309,9 @@ def detect_status() -> dict[str, object]:
     accent_csv = kread("kdeglobals", "General", "AccentColor", "")
     accent_hex = rgb_csv_to_hex(accent_csv, str(state.get("accent", default_accent)))
 
-    apps_active = max(40, min(100, int(kread("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", "90"))))
+    apps_active = max(40, min(100, int(kread("kwinrulesrc", "bigdatadesk-kde-apps", "opacityactive", "90"))))
     blur_strength = max(1, min(15, int(kread("kwinrc", "Effect-better-blur-dx", "BlurStrength", "14"))))
-    cur_wm = kread("kwinrulesrc", "glassdesk-kde-apps", "wmclass", KDE_GLASS_WMCLASS_BASE)
+    cur_wm = kread("kwinrulesrc", "bigdatadesk-kde-apps", "wmclass", KDE_GLASS_WMCLASS_BASE)
     protect_text = bool(state.get("protect_text", "org.kde.kate" not in cur_wm and r"org\.kde\.kate" not in cur_wm))
     ui_opacity = apps_active
     icons = kread("kdeglobals", "Icons", "Theme", "Neonyt-Dark-Icons")
@@ -432,36 +438,36 @@ def apply_icons(theme_name: str) -> None:
 
 
 def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int, protect_text: bool = True) -> None:
-    """Register or update glassdesk-kde-apps inside ~/.config/kwinrulesrc without duplicates."""
+    """Register or update bigdatadesk-kde-apps inside ~/.config/kwinrulesrc without duplicates."""
     existing_raw = kread("kwinrulesrc", "General", "Order", "") or kread("kwinrulesrc", "General", "rules", "")
     rules: list[str] = []
     for r in existing_raw.split(","):
         r = r.strip()
         if r and r not in rules:
             rules.append(r)
-    if "glassdesk-kde-apps" not in rules:
-        rules.append("glassdesk-kde-apps")
+    if "bigdatadesk-kde-apps" not in rules:
+        rules.append("bigdatadesk-kde-apps")
     joined = ",".join(rules)
     kwrite("kwinrulesrc", "General", "count", str(len(rules)))
     kwrite("kwinrulesrc", "General", "rules", joined)
     kwrite("kwinrulesrc", "General", "Order", joined)
 
     wm_pattern = KDE_GLASS_WMCLASS_BASE if protect_text else KDE_GLASS_WMCLASS_ALL
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "Description", "GlassDesk - Aplicaciones nativas de KDE")
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", str(active_pct))
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityactiverule", "2")
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityinactive", str(inactive_pct))
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityinactiverule", "2")
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclass", wm_pattern)
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclasscomplete", "false")
-    kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclassmatch", "3")
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "Description", "BigDataDesk - Aplicaciones nativas de KDE")
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "opacityactive", str(active_pct))
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "opacityactiverule", "2")
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "opacityinactive", str(inactive_pct))
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "opacityinactiverule", "2")
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "wmclass", wm_pattern)
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "wmclasscomplete", "false")
+    kwrite("kwinrulesrc", "bigdatadesk-kde-apps", "wmclassmatch", "3")
 
 
 def apply_opacity(pct: int) -> None:
     """Apply custom opacity percentage (40..100) across KDE rules, Darkly, Ptyxis, and Konsole."""
     pct = max(40, min(100, pct))
     state = load_state()
-    cur_wm = kread("kwinrulesrc", "glassdesk-kde-apps", "wmclass", KDE_GLASS_WMCLASS_BASE)
+    cur_wm = kread("kwinrulesrc", "bigdatadesk-kde-apps", "wmclass", KDE_GLASS_WMCLASS_BASE)
     protect_text = bool(state.get("protect_text", "org.kde.kate" not in cur_wm and r"org\.kde\.kate" not in cur_wm))
 
     if pct >= 100:
@@ -787,7 +793,7 @@ def step_wallpaper(delta: int) -> None:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|protect-text|reset|monitor|wallpaper|rotation>", file=sys.stderr)
+        print("Usage: bigdatadesk <status|theme|accent|icons|transparency|opacity|blur|protect-text|reset|monitor|wallpaper|rotation>", file=sys.stderr)
         return 1
 
     cmd = argv[1]

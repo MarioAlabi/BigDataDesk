@@ -131,8 +131,8 @@ ForegroundPositive=158,206,106
 ForegroundVisited=211,95,95
 
 [General]
-ColorScheme=GlassDeskMatteBlack
-Name=GlassDesk Matte Black
+ColorScheme=BigDataDeskMatteBlack
+Name=BigDataDesk Matte Black
 shadeSortColumn=true
 
 [KDE]

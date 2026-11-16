@@ -1,6 +1,6 @@
 # BigDataDesk
 
-Configuración personal para **KDE Plasma 6 (Wayland)** con estética *frosted-glass*, transparencia selectiva, esquemas de color unificados y un controlador ligero en la bandeja del sistema (`glassdesk-tray` + `glassdesk-popup`) para alternar fondos animados/estáticos, rotación automática y modo cristal/lectura.
+Configuración personal para **KDE Plasma 6 (Wayland)** con estética *frosted-glass*, transparencia selectiva, esquemas de color unificados y un controlador ligero en la bandeja del sistema (`bigdatadesk-tray` + `bigdatadesk-popup`) para alternar fondos animados/estáticos, rotación automática y modo cristal/lectura.
 
 > [!NOTE]
 > **Sin mantenimiento activo:** Este repositorio se comparte tal cual está para uso personal y de conocidos. No habrá soporte ni actualizaciones garantizadas — si te sirve y quieres adaptarlo o mantenerlo, siéntete libre de hacer un **fork**.
@@ -10,8 +10,8 @@ Configuración personal para **KDE Plasma 6 (Wayland)** con estética *frosted-g
 ### Escritorio y transparencia selectiva
 ![Escritorio con BigDataDesk](assets/screenshots/desktop.png)
 
-### Control rápido flotante (`glassdesk-popup`)
-![Control rápido GlassDesk](assets/screenshots/popup.png)
+### Control rápido flotante (`bigdatadesk-popup`)
+![Control rápido BigDataDesk](assets/screenshots/popup.png)
 
 ---
 
@@ -22,9 +22,9 @@ Configuración personal para **KDE Plasma 6 (Wayland)** con estética *frosted-g
 * **9 temas + acentos sincronizados:** `Tokyo Night`, `Ethereal`, `Kanagawa`, `Nord`, `Catppuccin`, `Matte Black`, `Jade Horse`, `Everforest` y `Gruvbox`, sincronizados con **KDE Plasma**, **Ptyxis** y **Konsole**.
 * **Soporte multimonitor inteligente:** Detecta dinámicamente cuántas pantallas activas tienes (si solo hay 1, oculta el selector de monitores) y detecta orientación **horizontal vs vertical** (usando `Vertical/` si hay contenido, o aplicando ajuste con relleno desenfocado si no).
 * **Controlador ligero:**
-  * `glassdesk`: CLI en Python (`0 MB` en reposo).
-  * `glassdesk-tray`: daemon nativo en Rust (`ksni`, ~`4–5 MB` RAM) con bloqueo de instancia única.
-  * `glassdesk-popup`: ventana flotante en PySide6 que no se cierra al hacer clic para ir probando fondos cómodamente.
+  * `bigdatadesk`: CLI en Python (`0 MB` en reposo).
+  * `bigdatadesk-tray`: daemon nativo en Rust (`ksni`, ~`4–5 MB` RAM) con bloqueo de instancia única.
+  * `bigdatadesk-popup`: ventana flotante en PySide6 que no se cierra al hacer clic para ir probando fondos cómodamente.
 * **Rotación independiente:** Activa o desactiva la rotación automática y sus minutos por separado para **Videos animados** y **Estáticos**.
 * **Parche para video en segundo plano:** Ajusta `TasksModel.qml` de *Smart Video Wallpaper Reborn* para que el video siga reproduciéndose detrás de ventanas transparentes maximizadas (`Ptyxis`, `Dolphin`, `Konsole`, etc.), pausándose únicamente ante apps opacas o pantalla completa.
 
@@ -54,7 +54,7 @@ Por tamaño y derechos de autor, el repositorio **no incluye** los videos ni im�
 
 ## Cómo actualizar (sin duplicar instalaciones)
 
-El script `install.sh` es **idempotente**: detecta instalaciones previas, detiene limpiamente la instancia activa de `glassdesk-tray`, sobreescribe los mismos binarios y perfiles en su sitio, actualiza la regla `glassdesk-kde-apps` en `kwinrulesrc` sin duplicarla y **conserva** tu estado actual (`state.json`) y tus carpetas de fondos.
+El script `install.sh` es **idempotente**: detecta instalaciones previas, detiene limpiamente la instancia activa de `bigdatadesk-tray`, sobreescribe los mismos binarios y perfiles en su sitio, actualiza la regla `bigdatadesk-kde-apps` en `kwinrulesrc` sin duplicarla y **conserva** tu estado actual (`state.json`) y tus carpetas de fondos.
 
 ```bash
 cd BigDataDesk

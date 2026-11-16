@@ -34,7 +34,7 @@ def main() -> int:
         txt = f.read()
 
     if "transparentApps" in txt and "isTransparentApp" in txt:
-        print("TasksModel.qml already patched for GlassDesk.")
+        print("TasksModel.qml already patched for BigDataDesk.")
         return 0
 
     if "property var appId:" not in txt:

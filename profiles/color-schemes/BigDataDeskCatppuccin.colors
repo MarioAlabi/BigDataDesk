@@ -131,8 +131,8 @@ ForegroundPositive=166,227,161
 ForegroundVisited=203,166,247
 
 [General]
-ColorScheme=GlassDeskCatppuccin
-Name=GlassDesk Catppuccin
+ColorScheme=BigDataDeskCatppuccin
+Name=BigDataDesk Catppuccin
 shadeSortColumn=true
 
 [KDE]

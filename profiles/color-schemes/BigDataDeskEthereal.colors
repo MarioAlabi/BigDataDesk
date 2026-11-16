@@ -131,8 +131,8 @@ ForegroundPositive=146,165,147
 ForegroundVisited=200,157,193
 
 [General]
-ColorScheme=GlassDeskEthereal
-Name=GlassDesk Ethereal
+ColorScheme=BigDataDeskEthereal
+Name=BigDataDesk Ethereal
 shadeSortColumn=true
 
 [KDE]

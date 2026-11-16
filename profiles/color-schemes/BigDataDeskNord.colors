@@ -131,8 +131,8 @@ ForegroundPositive=163,190,140
 ForegroundVisited=180,142,173
 
 [General]
-ColorScheme=GlassDeskNord
-Name=GlassDesk Nord
+ColorScheme=BigDataDeskNord
+Name=BigDataDesk Nord
 shadeSortColumn=true
 
 [KDE]
