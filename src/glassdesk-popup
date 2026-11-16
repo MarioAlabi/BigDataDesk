@@ -20,9 +20,65 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSlider,
     QSpinBox,
+    QStyle,
+    QStyleOptionSlider,
     QVBoxLayout,
     QWidget,
 )
+
+
+class JumpSlider(QSlider):
+    """Horizontal QSlider that jumps directly to clicked groove positions with pageStep=1."""
+
+    def __init__(self, minimum: int, maximum: int) -> None:
+        super().__init__(Qt.Orientation.Horizontal)
+        self.setRange(minimum, maximum)
+        self.setSingleStep(1)
+        self.setPageStep(1)
+
+    def _value_at_x(self, x: float) -> int:
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        groove = self.style().subControlRect(
+            QStyle.ComplexControl.CC_Slider, opt, QStyle.SubControl.SC_SliderGroove, self
+        )
+        handle = self.style().subControlRect(
+            QStyle.ComplexControl.CC_Slider, opt, QStyle.SubControl.SC_SliderHandle, self
+        )
+        span = max(1, groove.width() - handle.width())
+        offset = round(x) - groove.x() - handle.width() // 2
+        return QStyle.sliderValueFromPosition(
+            self.minimum(), self.maximum(), offset, span, opt.upsideDown
+        )
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+            hit = self.style().hitTestComplexControl(
+                QStyle.ComplexControl.CC_Slider, opt, event.position().toPoint(), self
+            )
+            if hit != QStyle.SubControl.SC_SliderHandle:
+                self.setSliderDown(True)
+                self.setValue(self._value_at_x(event.position().x()))
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        if self.isSliderDown() and (event.buttons() & Qt.MouseButton.LeftButton):
+            self.setValue(self._value_at_x(event.position().x()))
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton and self.isSliderDown():
+            self.setSliderDown(False)
+            self.sliderReleased.emit()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 GLASSDESK_BIN = os.path.expanduser("~/.local/bin/glassdesk")
 
@@ -142,14 +198,14 @@ class QuickPopup(QWidget):
         self._op_timer = QTimer(self)
         self._op_timer.setSingleShot(True)
         self._op_timer.setInterval(120)
-        self._op_timer.timeout.connect(lambda: self._exec("opacity", str(self.op_slider.value())))
+        self._op_timer.timeout.connect(self._commit_opacity)
 
         op_row = QHBoxLayout()
         op_lbl = QLabel("Opacidad:")
         op_lbl.setMinimumWidth(78)
-        self.op_slider = QSlider(Qt.Orientation.Horizontal)
-        self.op_slider.setRange(40, 100)
+        self.op_slider = JumpSlider(40, 100)
         self.op_slider.valueChanged.connect(self._on_opacity_changed)
+        self.op_slider.sliderReleased.connect(self._commit_opacity)
         self.op_val = QLabel("90%")
         self.op_val.setMinimumWidth(38)
         self.op_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -161,15 +217,15 @@ class QuickPopup(QWidget):
         self._blur_timer = QTimer(self)
         self._blur_timer.setSingleShot(True)
         self._blur_timer.setInterval(120)
-        self._blur_timer.timeout.connect(lambda: self._exec("blur", str(self.blur_slider.value())))
+        self._blur_timer.timeout.connect(self._commit_blur)
 
         blur_row = QHBoxLayout()
         blur_lbl = QLabel("Desenfoque:")
         blur_lbl.setMinimumWidth(78)
-        self.blur_slider = QSlider(Qt.Orientation.Horizontal)
-        self.blur_slider.setRange(1, 15)
+        self.blur_slider = JumpSlider(1, 15)
         self.blur_slider.valueChanged.connect(self._on_blur_changed)
-        self.blur_val = QLabel("10/15")
+        self.blur_slider.sliderReleased.connect(self._commit_blur)
+        self.blur_val = QLabel("14/15")
         self.blur_val.setMinimumWidth(38)
         self.blur_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         blur_row.addWidget(blur_lbl)
@@ -188,11 +244,24 @@ class QuickPopup(QWidget):
 
     def _on_opacity_changed(self, value: int) -> None:
         self.op_val.setText(f"{value}%")
-        self._op_timer.start()
+        if not self.op_slider.isSliderDown():
+            self._op_timer.start()
+
+    def _commit_opacity(self) -> None:
+        self._op_timer.stop()
+        val = self.op_slider.value()
+        tr_key = "reading" if val >= 100 else "glass"
+        self.tr_btns[tr_key].setChecked(True)
+        run_gd("opacity", str(val))
 
     def _on_blur_changed(self, value: int) -> None:
         self.blur_val.setText(f"{value}/15")
-        self._blur_timer.start()
+        if not self.blur_slider.isSliderDown():
+            self._blur_timer.start()
+
+    def _commit_blur(self) -> None:
+        self._blur_timer.stop()
+        run_gd("blur", str(self.blur_slider.value()))
 
     def _on_rot_toggled(self, checked: bool) -> None:
         self.rot_spin.setEnabled(checked)
@@ -249,14 +318,14 @@ class QuickPopup(QWidget):
             self.tr_btns[tr].setChecked(True)
 
         op = max(40, min(100, int(st.get("opacity", 90))))
-        if not self.op_slider.isSliderDown():
+        if not self.op_slider.isSliderDown() and not self._op_timer.isActive():
             self.op_slider.blockSignals(True)
             self.op_slider.setValue(op)
             self.op_slider.blockSignals(False)
             self.op_val.setText(f"{op}%")
 
         blur = max(1, min(15, int(st.get("blur", 14))))
-        if not self.blur_slider.isSliderDown():
+        if not self.blur_slider.isSliderDown() and not self._blur_timer.isActive():
             self.blur_slider.blockSignals(True)
             self.blur_slider.setValue(blur)
             self.blur_slider.blockSignals(False)

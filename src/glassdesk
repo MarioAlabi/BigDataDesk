@@ -501,10 +501,8 @@ def apply_protect_text(enabled: bool) -> None:
     apply_opacity(cur_opacity)
 
 
-def apply_blur(strength: int) -> None:
-    """Apply KWin Better Blur DX blur strength (1..15) + frosted readability tuning and reload."""
-    strength = max(1, min(15, strength))
-    noise = 4 if strength >= 13 else (3 if strength >= 9 else 2)
+def ensure_better_blur_defaults() -> None:
+    """Ensure Better Blur DX static rules and contrast settings exist in kwinrc."""
     kwrite("kwinrc", "Plugins", "better_blur_dxEnabled", "true")
     kwrite("kwinrc", "Plugins", "blurEnabled", "false")
     kwrite("kwinrc", "Effect-better-blur-dx", "BlurDecorations", "true")
@@ -514,12 +512,20 @@ def apply_blur(strength: int) -> None:
     kwrite("kwinrc", "Effect-better-blur-dx", "BlurNonMatching", "false")
     kwrite("kwinrc", "Effect-better-blur-dx", "WindowClasses", "org.gnome.Ptyxis\nptyxis\n/.*[Pp]tyxis.*/")
     kwrite("kwinrc", "Effect-better-blur-dx", "CornerRadius", "8")
-    kwrite("kwinrc", "Effect-better-blur-dx", "BlurStrength", str(strength))
-    kwrite("kwinrc", "Effect-better-blur-dx", "NoiseStrength", str(noise))
     kwrite("kwinrc", "Effect-better-blur-dx", "ForceContrastParams", "true")
     kwrite("kwinrc", "Effect-better-blur-dx", "Brightness", "82")
     kwrite("kwinrc", "Effect-better-blur-dx", "Contrast", "65")
     kwrite("kwinrc", "Effect-better-blur-dx", "Saturation", "115")
+
+
+def apply_blur(strength: int) -> None:
+    """Apply KWin Better Blur DX blur strength (1..15) + frosted grain and reload."""
+    strength = max(1, min(15, strength))
+    noise = 4 if strength >= 13 else (3 if strength >= 9 else 2)
+    if kread("kwinrc", "Effect-better-blur-dx", "BlurMatching", "") != "true":
+        ensure_better_blur_defaults()
+    kwrite("kwinrc", "Effect-better-blur-dx", "BlurStrength", str(strength))
+    kwrite("kwinrc", "Effect-better-blur-dx", "NoiseStrength", str(noise))
     run([qdbus_bin(), "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", "better_blur_dx"])
     save_state({"blur": strength})
 
@@ -534,6 +540,7 @@ def apply_reset_visuals() -> None:
     """Restore default crystal opacity (90%), blur strength (14), and Kate/Okular text protection."""
     kwrite("kwinrc", "Plugins", "diminactiveEnabled", "false")
     run([qdbus_bin(), "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.unloadEffect", "diminactive"])
+    ensure_better_blur_defaults()
     apply_blur(14)
     save_state({"protect_text": True, "opacity": 90})
     apply_opacity(90)
