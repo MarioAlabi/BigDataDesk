@@ -52,7 +52,7 @@ cd BigDataDesk
 ### Dónde colocar tus fondos (no incluidos en el repo)
 Por tamaño y derechos de autor, el repositorio **no incluye** los videos ni imágenes originales. Coloca tus propios archivos en:
 
-* **Videos animados (`.mp4`, `.webm`, `.mkv`):**
+* **Videos animados (`.mp4`, `.mov`, `.m4v`, `.mkv`, `.webm`, `.avi`, etc.):**
   * Horizontal: `~/Vídeos/Fondos/` *(o `~/Videos/Fondos/` si tu sistema está en inglés)*
   * Vertical *(opcional)*: `.../Fondos/Vertical/`
 * **Imágenes estáticas (`.webp`, `.png`, `.jpg`, `.jpeg`):**

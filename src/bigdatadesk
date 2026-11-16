@@ -212,23 +212,36 @@ def ptyxis_profile_schema() -> str | None:
     return f"org.gnome.Ptyxis.Profile:/org/gnome/Ptyxis/Profiles/{uuid}/"
 
 
+VIDEO_EXTENSIONS = (
+    ".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi",
+    ".ts", ".m2ts", ".mts", ".flv", ".wmv", ".mpg", ".mpeg", ".ogv", ".3gp", ".vob",
+)
+STATIC_EXTENSIONS = (".webp", ".png", ".jpg", ".jpeg", ".bmp", ".avif")
+
+
 def list_videos(vertical: bool = False) -> list[str]:
     folder = VIDEO_VERT_DIR if vertical else VIDEO_DIR
+    if not os.path.isdir(folder):
+        return []
     files: list[str] = []
-    for ext in ("*.mp4", "*.webm", "*.mkv"):
-        files.extend(glob.glob(os.path.join(folder, ext)))
+    for entry in os.scandir(folder):
+        if entry.is_file() and entry.name.lower().endswith(VIDEO_EXTENSIONS):
+            files.append(entry.path)
     return sorted(files)
 
 
 def list_static_wallpapers(vertical: bool = False) -> list[str]:
     folder = STATIC_VERT_DIR if vertical else STATIC_DIR
-    exts = ("*.webp", "*.png", "*.jpg", "*.jpeg")
+    if not os.path.isdir(folder):
+        return []
+    vert_prefix = os.path.abspath(STATIC_VERT_DIR) + os.sep
     files: list[str] = []
-    for ext in exts:
-        files.extend(glob.glob(os.path.join(folder, "**", ext), recursive=True))
-    if not vertical:
-        vert_prefix = os.path.abspath(STATIC_VERT_DIR) + os.sep
-        files = [p for p in files if not os.path.abspath(p).startswith(vert_prefix)]
+    for root_dir, _dirs, filenames in os.walk(folder):
+        if not vertical and (os.path.abspath(root_dir) + os.sep).startswith(vert_prefix):
+            continue
+        for name in filenames:
+            if name.lower().endswith(STATIC_EXTENSIONS):
+                files.append(os.path.join(root_dir, name))
     return sorted(files)
 
 
@@ -648,7 +661,8 @@ for (var i = 0; i < ds.length; i++) {{
     d.writeConfig("FillMode", {fill_mode});
     d.writeConfig("FillBlur", {"true" if fill_blur else "false"});
     d.writeConfig("FillBlurRadius", 64);
-    d.writeConfig("ResumeLastVideo", true);
+    d.writeConfig("LastVideoPosition", 0);
+    d.writeConfig("ResumeLastVideo", false);
     d.writeConfig("LastVideo", {json.dumps(video_uri)});
 }}
 """
