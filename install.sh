@@ -358,15 +358,20 @@ EOF
     kwriteconfig6 --file kwinrc --group "org.kde.kdecoration2" --key theme "Darkly"
     kwriteconfig6 --file kwinrc --group "Plugins" --key better_blur_dxEnabled "true"
     kwriteconfig6 --file kwinrc --group "Plugins" --key blurEnabled "false"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurDecorations "true"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurDocks "true"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurMatching "false"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurMenus "true"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurNonMatching "true"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key BlurStrength "12"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key CornerRadius "8"
-    kwriteconfig6 --file kwinrc --group "Effect-better_blur_dx" --key NoiseStrength "3"
     kwriteconfig6 --file kwinrc --group "Plugins" --key diminactiveEnabled "false"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurDecorations "true"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurDocks "true"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurMatching "true"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurMenus "true"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurNonMatching "false"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key WindowClasses $'org.gnome.Ptyxis\nptyxis\n/.*[Pp]tyxis.*/'
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurStrength "14"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key CornerRadius "8"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key NoiseStrength "4"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key ForceContrastParams "true"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key Brightness "82"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key Contrast "65"
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key Saturation "115"
   fi
 
   if command -v flatpak >/dev/null 2>&1; then
@@ -400,13 +405,13 @@ EOF
   # Preservar estado previo en actualizaciones o inicializar valores por defecto
   local cur_theme="ethereal"
   local cur_opacity="90"
-  local cur_blur="12"
+  local cur_blur="14"
   local cur_protect="on"
   local cur_icons="Neonyt-Dark-Icons"
   if [ -f "$STATE_DIR/state.json" ]; then
     cur_theme="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("theme","ethereal"))' "$STATE_DIR/state.json" 2>/dev/null || echo ethereal)"
     cur_opacity="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); t=d.get("transparency","glass"); print(d.get("opacity", 100 if t=="reading" else 90))' "$STATE_DIR/state.json" 2>/dev/null || echo 90)"
-    cur_blur="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("blur",12))' "$STATE_DIR/state.json" 2>/dev/null || echo 12)"
+    cur_blur="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("blur",14))' "$STATE_DIR/state.json" 2>/dev/null || echo 14)"
     cur_protect="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("on" if d.get("protect_text", True) else "off")' "$STATE_DIR/state.json" 2>/dev/null || echo on)"
     cur_icons="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("icons","Neonyt-Dark-Icons"))' "$STATE_DIR/state.json" 2>/dev/null || echo Neonyt-Dark-Icons)"
   fi

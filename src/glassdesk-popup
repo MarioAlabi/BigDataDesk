@@ -134,7 +134,7 @@ class QuickPopup(QWidget):
             self.tr_btns[tid] = btn
             tr_row.addWidget(btn)
         btn_reset = QPushButton("Por defecto")
-        btn_reset.setToolTip("Restaurar Opacidad 90%, Desenfoque 12/15 y editores protegidos")
+        btn_reset.setToolTip("Restaurar Opacidad 90%, Desenfoque 14/15 y editores protegidos")
         btn_reset.clicked.connect(lambda: self._exec("reset"))
         tr_row.addWidget(btn_reset)
         root.addLayout(tr_row)
@@ -255,7 +255,7 @@ class QuickPopup(QWidget):
             self.op_slider.blockSignals(False)
             self.op_val.setText(f"{op}%")
 
-        blur = max(1, min(15, int(st.get("blur", 12))))
+        blur = max(1, min(15, int(st.get("blur", 14))))
         if not self.blur_slider.isSliderDown():
             self.blur_slider.blockSignals(True)
             self.blur_slider.setValue(blur)
