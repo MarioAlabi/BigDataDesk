@@ -52,10 +52,10 @@ cd BigDataDesk
 ### Dónde colocar tus fondos (no incluidos en el repo)
 Por tamaño y derechos de autor, el repositorio **no incluye** los videos ni imágenes originales. Coloca tus propios archivos en:
 
-* **Videos animados (`.mp4`, `.mov`, `.m4v`, `.mkv`, `.webm`, `.avi`, etc.):**
+* **Videos animados (`.mp4`, `.mov`, `.m4v`, `.mkv`, `.webm`, `.avi`, `.ts`, `.m2ts`, `.mts`, `.flv`, `.wmv`, `.mpg`, `.mpeg`, `.ogv`, `.3gp`, `.vob`):**
   * Horizontal: `~/Vídeos/Fondos/` *(o `~/Videos/Fondos/` si tu sistema está en inglés)*
   * Vertical *(opcional)*: `.../Fondos/Vertical/`
-* **Imágenes estáticas (`.webp`, `.png`, `.jpg`, `.jpeg`):**
+* **Imágenes estáticas (`.webp`, `.png`, `.jpg`, `.jpeg`, `.bmp`, `.avif`):**
   * Horizontal: `~/.local/share/wallpapers/Fondos/`
   * Vertical *(opcional)*: `~/.local/share/wallpapers/Fondos/Vertical/`
 
@@ -86,6 +86,50 @@ Para eliminar binarios, autostart, esquemas y regla de ventana de KWin (sin borr
 cd BigDataDesk
 ./uninstall.sh
 ```
+
+---
+
+## Q&A (Preguntas frecuentes)
+
+### Un fondo de video se ve negro o no se reproduce, ¿por qué?
+Casi siempre se debe a **códecs multimedia faltantes** en tu distro (especialmente H.264 / H.265 / DNxHR en `Qt6 Multimedia` / `FFmpeg`).
+
+El instalador `install.sh` **no instala ni reemplaza códecs del sistema a propósito** para evitar conflictos de repositorios o controladores gráficos (por ejemplo en Fedora con GPU Nvidia). Si algún video no se muestra, instala los códecs según tu distribución y reinicia `plasmashell` (o cierra sesión):
+
+* **Arch Linux y derivadas (CachyOS, EndeavourOS, Manjaro):**
+  ```bash
+  sudo pacman -S --needed ffmpeg qt6-multimedia-ffmpeg
+  ```
+
+* **Fedora:**
+  1. Habilita **RPM Fusion (Free y Nonfree)**:
+     ```bash
+     sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+       https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+     ```
+  2. Cambia `ffmpeg-free` por `ffmpeg` completo e instala `@multimedia`:
+     ```bash
+     sudo dnf swap ffmpeg-free ffmpeg --allowerasing
+     sudo dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+     ```
+  > *(Nota: si usas **Nobara**, no ejecutes `dnf swap ffmpeg-free ffmpeg`; usa las actualizaciones/fixups propios de **Nobara Welcome**).*
+
+* **Debian, Ubuntu y derivadas (Kubuntu, KDE Neon):**
+  ```bash
+  sudo apt update
+  sudo apt install ffmpeg qml6-module-qtmultimedia libqt6multimedia6
+  ```
+  Y para códecs propietarios adicionales:
+  ```bash
+  # En Debian (con repos non-free habilitados):
+  sudo apt install libavcodec-extra
+
+  # En Ubuntu / Kubuntu:
+  sudo apt install ubuntu-restricted-extras
+  ```
+
+### ¿Por qué al darle *Siguiente* en un monitor vertical no cambia el video?
+Si agregaste **un solo archivo** dentro de `.../Fondos/Vertical/` y tienes seleccionado únicamente ese monitor vertical en el selector, *Siguiente* y *Anterior* rotan solo dentro de `Vertical/` (1 archivo). Agrega más videos verticales en `Vertical/` o cambia el selector de pantalla a **Ambas** / **Mon 1 (H)**.
 
 ---
 
