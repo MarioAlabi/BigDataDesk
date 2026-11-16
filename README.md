@@ -7,11 +7,20 @@ Configuración personal para **KDE Plasma 6 (Wayland)** con estética *frosted-g
 
 ## Capturas
 
-### Escritorio y transparencia selectiva
+### Escritorio en Modo Cristal (`90%` opacidad · blur `14/15`)
 ![Escritorio con BigDataDesk](assets/screenshots/desktop.png)
 
 ### Control rápido flotante (`bigdatadesk-popup`)
 ![Control rápido BigDataDesk](assets/screenshots/popup.png)
+
+### Menú en la bandeja del sistema (`bigdatadesk-tray`)
+![Menú de bandeja BigDataDesk](assets/screenshots/tray-menu.png)
+
+### Cambio de tema, acento e iconos (`Matte Black` + `Sweet-Red-Filled` + `Konsole`)
+![Tema Matte Black en Konsole y BigDataDesk](assets/screenshots/theme-matte-black.png)
+
+### Modo Lectura (`100%` opaco)
+![Modo Lectura 100% opaco](assets/screenshots/mode-reading.png)
 
 ---
 
