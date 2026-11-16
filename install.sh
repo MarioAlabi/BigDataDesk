@@ -364,7 +364,7 @@ EOF
     kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurMatching "true"
     kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurMenus "true"
     kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurNonMatching "false"
-    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key WindowClasses $'org.gnome.Ptyxis\nptyxis\n/.*[Pp]tyxis.*/'
+    kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key WindowClasses $'org.gnome.Ptyxis\nptyxis\n/.*[Pp]tyxis.*/\norg.kde.dolphin\ndolphin\norg.kde.konsole\nkonsole\nsystemsettings\norg.kde.systemsettings\norg.kde.ark\norg.kde.kcalc\norg.kde.spectacle'
     kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key BlurStrength "14"
     kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key CornerRadius "8"
     kwriteconfig6 --file kwinrc --group "Effect-better-blur-dx" --key NoiseStrength "4"

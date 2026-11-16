@@ -365,8 +365,18 @@ def sync_konsole_from_palette(pal_name: str, opacity: float | None = None) -> No
 
     if "Background" in colors:
         txt = re.sub(r"(\[Background\]\nColor=).*", rf"\g<1>{colors['Background']}", txt)
+        txt = re.sub(r"(\[BackgroundFaint\]\nColor=).*", rf"\g<1>{colors['Background']}", txt)
     if "Foreground" in colors:
         txt = re.sub(r"(\[Foreground\]\nColor=).*", rf"\g<1>{colors['Foreground']}", txt)
+        txt = re.sub(r"(\[ForegroundIntense\]\nColor=).*", rf"\g<1>{colors['Foreground']}", txt)
+    for idx in range(8):
+        norm_key = f"Color{idx}"
+        bright_key = f"Color{idx + 8}"
+        if norm_key in colors:
+            txt = re.sub(rf"(\[Color{idx}\]\nColor=).*", rf"\g<1>{colors[norm_key]}", txt)
+            txt = re.sub(rf"(\[Color{idx}Faint\]\nColor=).*", rf"\g<1>{colors[norm_key]}", txt)
+        if bright_key in colors:
+            txt = re.sub(rf"(\[Color{idx}Intense\]\nColor=).*", rf"\g<1>{colors[bright_key]}", txt)
     if opacity is not None:
         txt = re.sub(r"^Opacity=.*$", f"Opacity={opacity:.2f}", txt, flags=re.MULTILINE)
 
@@ -497,11 +507,23 @@ def apply_opacity(pct: int) -> None:
 def apply_protect_text(enabled: bool) -> None:
     """Keep document/code readers (Kate, Okular) opaque while keeping terminals & Dolphin glassy."""
     state = save_state({"protect_text": enabled})
+    ensure_better_blur_defaults(protect_text=enabled)
+    run([qdbus_bin(), "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", "better_blur_dx"])
     cur_opacity = int(state.get("opacity", 90))
     apply_opacity(cur_opacity)
 
 
-def ensure_better_blur_defaults() -> None:
+BLUR_CLASSES_BASE = (
+    "org.gnome.Ptyxis\nptyxis\n/.*[Pp]tyxis.*/\n"
+    "org.kde.dolphin\ndolphin\n"
+    "org.kde.konsole\nkonsole\n"
+    "systemsettings\norg.kde.systemsettings\n"
+    "org.kde.ark\norg.kde.kcalc\norg.kde.spectacle"
+)
+BLUR_CLASSES_ALL = BLUR_CLASSES_BASE + "\norg.kde.kate\nkate\norg.kde.okular\nokular"
+
+
+def ensure_better_blur_defaults(protect_text: bool = True) -> None:
     """Ensure Better Blur DX static rules and contrast settings exist in kwinrc."""
     kwrite("kwinrc", "Plugins", "better_blur_dxEnabled", "true")
     kwrite("kwinrc", "Plugins", "blurEnabled", "false")
@@ -510,7 +532,7 @@ def ensure_better_blur_defaults() -> None:
     kwrite("kwinrc", "Effect-better-blur-dx", "BlurMenus", "true")
     kwrite("kwinrc", "Effect-better-blur-dx", "BlurMatching", "true")
     kwrite("kwinrc", "Effect-better-blur-dx", "BlurNonMatching", "false")
-    kwrite("kwinrc", "Effect-better-blur-dx", "WindowClasses", "org.gnome.Ptyxis\nptyxis\n/.*[Pp]tyxis.*/")
+    kwrite("kwinrc", "Effect-better-blur-dx", "WindowClasses", BLUR_CLASSES_BASE if protect_text else BLUR_CLASSES_ALL)
     kwrite("kwinrc", "Effect-better-blur-dx", "CornerRadius", "8")
     kwrite("kwinrc", "Effect-better-blur-dx", "ForceContrastParams", "true")
     kwrite("kwinrc", "Effect-better-blur-dx", "Brightness", "82")
@@ -522,8 +544,10 @@ def apply_blur(strength: int) -> None:
     """Apply KWin Better Blur DX blur strength (1..15) + frosted grain and reload."""
     strength = max(1, min(15, strength))
     noise = 4 if strength >= 13 else (3 if strength >= 9 else 2)
-    if kread("kwinrc", "Effect-better-blur-dx", "BlurMatching", "") != "true":
-        ensure_better_blur_defaults()
+    cur_wc = kread("kwinrc", "Effect-better-blur-dx", "WindowClasses", "")
+    if "org.kde.dolphin" not in cur_wc:
+        state = load_state()
+        ensure_better_blur_defaults(protect_text=bool(state.get("protect_text", True)))
     kwrite("kwinrc", "Effect-better-blur-dx", "BlurStrength", str(strength))
     kwrite("kwinrc", "Effect-better-blur-dx", "NoiseStrength", str(noise))
     run([qdbus_bin(), "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", "better_blur_dx"])
