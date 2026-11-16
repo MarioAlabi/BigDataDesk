@@ -1,0 +1,49 @@
+@import 'colors.css';
+@import 'window_decorations.css';
+
+window headerbar button.titlebutton,
+window .titlebar button.titlebutton,
+headerbar button.titlebutton,
+.titlebar button.titlebutton {
+    color: @theme_titlebar_foreground_breeze;
+}
+
+window headerbar button.titlebutton.close,
+window .titlebar button.titlebutton.close {
+    background-image: url("assets/close-normal.svg");
+}
+
+window headerbar button.titlebutton.close:hover,
+window .titlebar button.titlebutton.close:hover {
+    background-image: url("assets/close-hover.svg");
+}
+
+window headerbar button.titlebutton.maximize,
+window .titlebar button.titlebutton.maximize {
+    background-image: url("assets/maximize-normal.svg");
+}
+
+window headerbar button.titlebutton.maximize:hover,
+window .titlebar button.titlebutton.maximize:hover {
+    background-image: url("assets/maximize-hover.svg");
+}
+
+window.maximized headerbar button.titlebutton.maximize,
+window.maximized .titlebar button.titlebutton.maximize {
+    background-image: url("assets/maximized-normal.svg");
+}
+
+window.maximized headerbar button.titlebutton.maximize:hover,
+window.maximized .titlebar button.titlebutton.maximize:hover {
+    background-image: url("assets/maximized-hover.svg");
+}
+
+window headerbar button.titlebutton.minimize,
+window .titlebar button.titlebutton.minimize {
+    background-image: url("assets/minimize-normal.svg");
+}
+
+window headerbar button.titlebutton.minimize:hover,
+window .titlebar button.titlebutton.minimize:hover {
+    background-image: url("assets/minimize-hover.svg");
+}

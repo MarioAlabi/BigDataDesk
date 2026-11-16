@@ -1,0 +1,17 @@
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+This repository ("BigDataDesk") bundles personal scripts, configuration templates,
+and installation tooling released under the GNU General Public License v3.0 (GPL-3.0)
+for compatibility with KDE Plasma, Darkly, KWin Effects Better Blur DX, and
+Smart Video Wallpaper Reborn.
+
+Full license text: https://www.gnu.org/licenses/gpl-3.0.txt
+
+Third-party components downloaded at install time keep their respective upstream
+licenses and copyrights:
+- Darkly (Bali10050/Darkly) - GPLv2
+- kwin-effects-better-blur-dx (xarblu/kwin-effects-better-blur-dx) - GPLv3
+- Smart Video Wallpaper Reborn (luisbocanegra/plasma-smart-video-wallpaper-reborn) - GPLv2+
+- Sweet-folders (EliverLara/Sweet-folders) - GPLv3
+- Neonyt-Dark-Icons (KDE Store / Pling #1463720) - GPLv3

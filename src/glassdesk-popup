@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Compact floating GlassDesk controller that stays open across repeated clicks."""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QGuiApplication, QIcon
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QCheckBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
+
+GLASSDESK_BIN = os.path.expanduser("~/.local/bin/glassdesk")
+
+
+def run_gd(*args: str) -> str:
+    res = subprocess.run([GLASSDESK_BIN, *args], capture_output=True, text=True)
+    return res.stdout.strip()
+
+
+class QuickPopup(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle("GlassDesk — Control rápido")
+        self.setWindowIcon(QIcon.fromTheme("preferences-desktop-color"))
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.WindowCloseButtonHint
+        )
+        self.setFixedWidth(380)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(8)
+
+        # Dynamic monitor selector (hidden automatically when only 1 screen is active)
+        self.mon_widget = QWidget()
+        mon_row = QHBoxLayout(self.mon_widget)
+        mon_row.setContentsMargins(0, 0, 0, 0)
+        mon_row.addWidget(QLabel("Pantalla:"))
+        self.mon_group = QButtonGroup(self)
+        self.mon_btns: dict[str, QPushButton] = {}
+
+        btn_all = QPushButton("Todas")
+        btn_all.setCheckable(True)
+        btn_all.clicked.connect(lambda: self._exec("monitor", "all"))
+        self.mon_group.addButton(btn_all)
+        self.mon_btns["all"] = btn_all
+        mon_row.addWidget(btn_all)
+
+        for sid in ("0", "1", "2"):
+            btn = QPushButton(f"Mon {int(sid) + 1}")
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda _=False, m=sid: self._exec("monitor", m))
+            self.mon_group.addButton(btn)
+            self.mon_btns[sid] = btn
+            mon_row.addWidget(btn)
+        root.addWidget(self.mon_widget)
+
+        # Wallpaper type
+        type_row = QHBoxLayout()
+        type_row.addWidget(QLabel("Tipo:"))
+        self.type_group = QButtonGroup(self)
+        self.type_btns: dict[str, QPushButton] = {}
+        for tid, label in (("video", "Videos animados"), ("static", "Estáticos")):
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda _=False, t=tid: self._exec("wallpaper", t))
+            self.type_group.addButton(btn)
+            self.type_btns[tid] = btn
+            type_row.addWidget(btn)
+        root.addLayout(type_row)
+
+        # Current wallpaper label
+        self.file_label = QLabel("—")
+        self.file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.file_label.setStyleSheet("font-size: 11px; opacity: 0.85; padding: 2px 4px;")
+        root.addWidget(self.file_label)
+
+        # Prev / Next buttons
+        nav_row = QHBoxLayout()
+        self.btn_prev = QPushButton("◀ Anterior")
+        self.btn_prev.setMinimumHeight(34)
+        self.btn_prev.clicked.connect(lambda: self._exec("wallpaper", "prev"))
+        self.btn_next = QPushButton("Siguiente ▶")
+        self.btn_next.setMinimumHeight(34)
+        self.btn_next.clicked.connect(lambda: self._exec("wallpaper", "next"))
+        nav_row.addWidget(self.btn_prev)
+        nav_row.addWidget(self.btn_next)
+        root.addLayout(nav_row)
+
+        # Auto-rotation checkbox + minutes (per active wallpaper type: video / static)
+        rot_row = QHBoxLayout()
+        self.rot_check = QCheckBox("Rotación automática")
+        self.rot_check.toggled.connect(self._on_rot_toggled)
+        self.rot_spin = QSpinBox()
+        self.rot_spin.setRange(1, 120)
+        self.rot_spin.setSuffix(" min")
+        self.rot_spin.setEnabled(False)
+        self.rot_apply = QPushButton("Aplicar")
+        self.rot_apply.setEnabled(False)
+        self.rot_apply.clicked.connect(self._on_rot_apply)
+        rot_row.addWidget(self.rot_check)
+        rot_row.addStretch()
+        rot_row.addWidget(self.rot_spin)
+        rot_row.addWidget(self.rot_apply)
+        root.addLayout(rot_row)
+
+        # Transparency quick toggle
+        tr_row = QHBoxLayout()
+        tr_row.addWidget(QLabel("Estilo:"))
+        self.tr_group = QButtonGroup(self)
+        self.tr_btns: dict[str, QPushButton] = {}
+        for tid, label in (("glass", "Modo Cristal"), ("reading", "Modo Lectura")):
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda _=False, t=tid: self._exec("transparency", t))
+            self.tr_group.addButton(btn)
+            self.tr_btns[tid] = btn
+            tr_row.addWidget(btn)
+        root.addLayout(tr_row)
+
+        self._sync_ui()
+
+    def _on_rot_toggled(self, checked: bool) -> None:
+        self.rot_spin.setEnabled(checked)
+        self.rot_apply.setEnabled(checked)
+        self._exec("rotation", "on" if checked else "off", str(self.rot_spin.value()))
+
+    def _on_rot_apply(self) -> None:
+        self._exec("rotation", "on" if self.rot_check.isChecked() else "off", str(self.rot_spin.value()))
+
+    def _exec(self, *args: str) -> None:
+        run_gd(*args)
+        QTimer.singleShot(120, self._sync_ui)
+
+    def _sync_ui(self) -> None:
+        try:
+            st = json.loads(run_gd("status"))
+        except json.JSONDecodeError:
+            return
+
+        rot_on = bool(st.get("rotate_enabled", False))
+        rot_min = int(st.get("rotate_minutes", 5))
+        self.rot_check.blockSignals(True)
+        self.rot_check.setChecked(rot_on)
+        self.rot_check.blockSignals(False)
+        self.rot_spin.setValue(rot_min)
+        self.rot_spin.setEnabled(rot_on)
+        self.rot_apply.setEnabled(rot_on)
+
+        screens = st.get("screens", [])
+        active_ids = {str(int(s["screen"])): s for s in screens if "screen" in s}
+        self.mon_widget.setVisible(len(active_ids) > 1)
+        self.mon_btns["all"].setText("Ambas" if len(active_ids) == 2 else "Todas")
+
+        for sid in ("0", "1", "2"):
+            btn = self.mon_btns[sid]
+            if sid in active_ids:
+                orient = "V" if active_ids[sid].get("vertical") else "H"
+                btn.setText(f"Mon {int(sid) + 1} ({orient})")
+                btn.setVisible(True)
+            else:
+                btn.setVisible(False)
+
+        mon = str(st.get("monitor", "all"))
+        if mon in self.mon_btns and self.mon_btns[mon].isVisible():
+            self.mon_btns[mon].setChecked(True)
+        elif active_ids:
+            self.mon_btns["all"].setChecked(True)
+
+        wp = str(st.get("wallpaper", "video"))
+        if wp in self.type_btns:
+            self.type_btns[wp].setChecked(True)
+        tr = str(st.get("transparency", "glass"))
+        if tr in self.tr_btns:
+            self.tr_btns[tr].setChecked(True)
+        cur = str(st.get("current_file", "")).strip()
+        self.file_label.setText(cur if cur else "—")
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+            return
+        super().keyPressEvent(event)
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            geo = screen.availableGeometry()
+            self.move(geo.right() - self.width() - 16, geo.bottom() - self.height() - 16)
+
+
+def main() -> int:
+    app = QApplication(sys.argv)
+
+    server_name = "glassdesk-popup-instance"
+    probe = QLocalSocket()
+    probe.connectToServer(server_name)
+    if probe.waitForConnected(150):
+        probe.write(b"raise")
+        probe.waitForBytesWritten(150)
+        probe.disconnectFromServer()
+        return 0
+
+    QLocalServer.removeServer(server_name)
+    server = QLocalServer()
+    if not server.listen(server_name):
+        return 0
+
+    win = QuickPopup()
+
+    def on_new_conn() -> None:
+        conn = server.nextPendingConnection()
+        if conn:
+            conn.close()
+        win._sync_ui()
+        win.show()
+        win.raise_()
+        win.activateWindow()
+
+    server.newConnection.connect(on_new_conn)
+    win.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

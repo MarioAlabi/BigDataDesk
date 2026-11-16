@@ -1,0 +1,720 @@
+#!/usr/bin/env python3
+"""GlassDesk — KDE Plasma theme, accent, transparency, and orientation-aware wallpaper controller."""
+
+from __future__ import annotations
+
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib.parse
+
+STATE_FILE = os.path.expanduser("~/.config/glassdesk/state.json")
+PALETTE_DIR = os.path.expanduser("~/.local/share/org.gnome.Ptyxis/palettes")
+KONSOLE_SCHEME = os.path.expanduser("~/.local/share/konsole/GlassDesk.colorscheme")
+KWINRULES_FILE = os.path.expanduser("~/.config/kwinrulesrc")
+
+
+def resolve_video_dir() -> str:
+    """Resolve user's Fondos video directory across Spanish/English/other XDG locales."""
+    home = os.path.expanduser("~")
+    es_dir = os.path.join(home, "Vídeos", "Fondos")
+    try:
+        res = subprocess.run(["xdg-user-dir", "VIDEOS"], capture_output=True, text=True)
+        xdg_videos = res.stdout.strip()
+    except OSError:
+        xdg_videos = ""
+
+    if xdg_videos and os.path.abspath(xdg_videos) != os.path.abspath(home):
+        candidate = os.path.join(xdg_videos, "Fondos")
+        if os.path.isdir(candidate) or not os.path.isdir(es_dir):
+            return candidate
+    if os.path.isdir(es_dir):
+        return es_dir
+    return os.path.join(home, "Videos", "Fondos")
+
+
+VIDEO_DIR = resolve_video_dir()
+VIDEO_VERT_DIR = os.path.join(VIDEO_DIR, "Vertical")
+STATIC_DIR = os.path.expanduser("~/.local/share/wallpapers/Fondos")
+STATIC_VERT_DIR = os.path.join(STATIC_DIR, "Vertical")
+
+THEMES: dict[str, dict[str, str]] = {
+    "tokyo-night": {
+        "label": "Tokyo Night",
+        "scheme": "GlassDeskTokyoNight",
+        "ptyxis": "GlassDesk Tokyo Night",
+        "accent": "#7aa2f7",
+        "wallpaper_subdir": "tokyo-night",
+    },
+    "ethereal": {
+        "label": "Ethereal",
+        "scheme": "GlassDeskEthereal",
+        "ptyxis": "GlassDesk Ethereal",
+        "accent": "#7d82d9",
+        "wallpaper_subdir": "ethereal",
+    },
+    "kanagawa": {
+        "label": "Kanagawa",
+        "scheme": "GlassDeskKanagawa",
+        "ptyxis": "GlassDesk Kanagawa",
+        "accent": "#7e9cd8",
+        "wallpaper_subdir": "kanagawa",
+    },
+    "nord": {
+        "label": "Nord",
+        "scheme": "GlassDeskNord",
+        "ptyxis": "GlassDesk Nord",
+        "accent": "#81a1c1",
+        "wallpaper_subdir": "tokyo-night",
+    },
+    "catppuccin": {
+        "label": "Catppuccin",
+        "scheme": "GlassDeskCatppuccin",
+        "ptyxis": "GlassDesk Catppuccin",
+        "accent": "#89b4fa",
+        "wallpaper_subdir": "catppuccin",
+    },
+    "matte-black": {
+        "label": "Matte Black (Rojo)",
+        "scheme": "GlassDeskMatteBlack",
+        "ptyxis": "GlassDesk Matte Black",
+        "accent": "#ff1e38",
+        "wallpaper_subdir": "starship",
+    },
+    "jade-horse": {
+        "label": "Jade Horse",
+        "scheme": "GlassDeskJadeHorse",
+        "ptyxis": "GlassDesk Jade Horse",
+        "accent": "#8bcbb1",
+        "wallpaper_subdir": "starship",
+    },
+    "everforest": {
+        "label": "Everforest",
+        "scheme": "GlassDeskEverforest",
+        "ptyxis": "GlassDesk Everforest",
+        "accent": "#7fbbb3",
+        "wallpaper_subdir": "starship",
+    },
+    "gruvbox": {
+        "label": "Gruvbox",
+        "scheme": "GlassDeskGruvbox",
+        "ptyxis": "GlassDesk Gruvbox",
+        "accent": "#7daea3",
+        "wallpaper_subdir": "starship",
+    },
+}
+
+TRANSPARENCY_PROFILES: dict[str, dict[str, object]] = {
+    "glass": {
+        "ptyxis_opacity": 0.82,
+        "kde_active": 90,
+        "kde_inactive": 84,
+        "dolphin_view": 72,
+        "dolphin_sidebar": 56,
+        "menus": 74,
+        "bars": 62,
+    },
+    "reading": {
+        "ptyxis_opacity": 1.0,
+        "kde_active": 100,
+        "kde_inactive": 98,
+        "dolphin_view": 100,
+        "dolphin_sidebar": 95,
+        "menus": 98,
+        "bars": 98,
+    },
+}
+
+
+def qdbus_bin() -> str:
+    return (
+        shutil.which("qdbus-qt6")
+        or shutil.which("qdbus6")
+        or shutil.which("qdbus")
+        or "qdbus6"
+    )
+
+
+def changeicons_bin() -> str | None:
+    found = shutil.which("plasma-changeicons")
+    if found:
+        return found
+    for path in (
+        "/usr/libexec/plasma-changeicons",
+        "/usr/lib/plasma-changeicons",
+        "/usr/lib/kf6/plasma-changeicons",
+        "/usr/lib/x86_64-linux-gnu/libexec/plasma-changeicons",
+    ):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None
+
+
+def run(cmd: list[str]) -> str:
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as exc:
+        print(f"Command failed ({cmd[0]}): {exc}", file=sys.stderr)
+        return ""
+    if res.returncode != 0 and res.stderr:
+        print(res.stderr.strip(), file=sys.stderr)
+    return res.stdout.strip()
+
+
+def kread(file_name: str, group: str, key: str, default: str = "") -> str:
+    val = run(["kreadconfig6", "--file", file_name, "--group", group, "--key", key])
+    return val if val else default
+
+
+def kwrite(file_name: str, group: str, key: str, value: str) -> None:
+    run(["kwriteconfig6", "--file", file_name, "--group", group, "--key", key, value])
+
+
+def load_state() -> dict[str, object]:
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def save_state(updates: dict[str, object]) -> dict[str, object]:
+    state = load_state()
+    state.update(updates)
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+    return state
+
+
+def ptyxis_profile_schema() -> str | None:
+    if not shutil.which("gsettings"):
+        return None
+    uuid = run(["gsettings", "get", "org.gnome.Ptyxis", "default-profile-uuid"]).strip("'")
+    if not uuid or uuid.startswith("No such schema"):
+        return None
+    return f"org.gnome.Ptyxis.Profile:/org/gnome/Ptyxis/Profiles/{uuid}/"
+
+
+def list_videos(vertical: bool = False) -> list[str]:
+    folder = VIDEO_VERT_DIR if vertical else VIDEO_DIR
+    files: list[str] = []
+    for ext in ("*.mp4", "*.webm", "*.mkv"):
+        files.extend(glob.glob(os.path.join(folder, ext)))
+    return sorted(files)
+
+
+def list_static_wallpapers(vertical: bool = False) -> list[str]:
+    folder = STATIC_VERT_DIR if vertical else STATIC_DIR
+    exts = ("*.webp", "*.png", "*.jpg", "*.jpeg")
+    files: list[str] = []
+    for ext in exts:
+        files.extend(glob.glob(os.path.join(folder, "**", ext), recursive=True))
+    if not vertical:
+        vert_prefix = os.path.abspath(STATIC_VERT_DIR) + os.sep
+        files = [p for p in files if not os.path.abspath(p).startswith(vert_prefix)]
+    return sorted(files)
+
+
+def query_screens() -> list[dict[str, object]]:
+    js = """
+var ds = desktops();
+var seen = {};
+var out = [];
+for (var i = 0; i < ds.length; i++) {
+    var s = ds[i].screen;
+    if (s < 0 || s >= screenCount || seen[s]) continue;
+    seen[s] = true;
+    var g = screenGeometry(s);
+    out.push({
+        screen: s,
+        width: g.width,
+        height: g.height,
+        vertical: g.height > g.width,
+        plugin: ds[i].wallpaperPlugin
+    });
+}
+out.sort(function(a, b) { return a.screen - b.screen; });
+print(JSON.stringify(out));
+"""
+    raw = run([qdbus_bin(), "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", js])
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list) and parsed:
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    return [{"screen": 0, "width": 1920, "height": 1080, "vertical": False, "plugin": ""}]
+
+
+def target_monitor(screens: list[dict[str, object]] | None = None) -> str:
+    val = str(load_state().get("monitor", "all"))
+    if screens is None:
+        screens = query_screens()
+    valid_ids = {str(int(s["screen"])) for s in screens}
+    if len(screens) <= 1:
+        return next(iter(valid_ids), "0")
+    if val == "all" or val in valid_ids:
+        return val
+    return "all"
+
+
+def target_screens(screens: list[dict[str, object]], target: str) -> list[dict[str, object]]:
+    if target != "all":
+        matched = [s for s in screens if str(int(s["screen"])) == target]
+        if matched:
+            return matched
+    return screens
+
+
+def rgb_csv_to_hex(csv_val: str, fallback: str) -> str:
+    parts = [p.strip() for p in csv_val.split(",")]
+    if len(parts) >= 3 and all(p.isdigit() for p in parts[:3]):
+        r, g, b = (max(0, min(255, int(p))) for p in parts[:3])
+        return f"#{r:02x}{g:02x}{b:02x}"
+    return fallback
+
+
+def detect_status() -> dict[str, object]:
+    state = load_state()
+    scheme = kread("kdeglobals", "General", "ColorScheme", "GlassDeskEthereal")
+    theme_slug = next(
+        (k for k, v in THEMES.items() if v["scheme"] == scheme or v["scheme"].replace("GlassDesk", "Omarchy") == scheme),
+        str(state.get("theme", "ethereal")),
+    )
+
+    default_accent = THEMES.get(theme_slug, {}).get("accent", "#7d82d9")
+    accent_csv = kread("kdeglobals", "General", "AccentColor", "")
+    accent_hex = rgb_csv_to_hex(accent_csv, str(state.get("accent", default_accent)))
+
+    apps_active = int(kread("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", "90"))
+    icons = kread("kdeglobals", "Icons", "Theme", "Neonyt-Dark-Icons")
+    transparency_mode = "reading" if apps_active >= 100 else "glass"
+
+    screens = query_screens()
+    monitor = target_monitor(screens)
+    screen_check = int(monitor) if monitor != "all" else int(screens[0]["screen"])
+    ref_screen = next((s for s in screens if int(s["screen"]) == screen_check), screens[0])
+    wallpaper_mode = "video" if "smart.video.wallpaper" in str(ref_screen.get("plugin", "")) else "static"
+
+    cur_key = f"last_{wallpaper_mode}_{screen_check}"
+    cur_val = str(state.get(cur_key, state.get(f"last_{wallpaper_mode}", "")))
+
+    rot_vid_on = bool(state.get("rotate_video_enabled", False))
+    rot_vid_min = int(state.get("rotate_video_minutes", 5))
+    rot_stat_on = bool(state.get("rotate_static_enabled", False))
+    rot_stat_min = int(state.get("rotate_static_minutes", 5))
+
+    return {
+        "theme": theme_slug,
+        "accent": accent_hex,
+        "icons": icons,
+        "transparency": transparency_mode,
+        "wallpaper": wallpaper_mode,
+        "monitor": monitor,
+        "screen_count": len(screens),
+        "screens": screens,
+        "current_file": os.path.basename(urllib.parse.unquote(cur_val)),
+        "rotate_enabled": rot_vid_on if wallpaper_mode == "video" else rot_stat_on,
+        "rotate_minutes": rot_vid_min if wallpaper_mode == "video" else rot_stat_min,
+        "rotate_video_enabled": rot_vid_on,
+        "rotate_video_minutes": rot_vid_min,
+        "rotate_static_enabled": rot_stat_on,
+        "rotate_static_minutes": rot_stat_min,
+    }
+
+
+def sync_konsole_from_palette(pal_name: str, opacity: float | None = None) -> None:
+    if not os.path.exists(KONSOLE_SCHEME):
+        return
+    pal_path = os.path.join(PALETTE_DIR, f"{pal_name}.palette")
+    colors: dict[str, str] = {}
+    if os.path.exists(pal_path):
+        with open(pal_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    if v.startswith("#") and len(v) == 7:
+                        colors[k] = f"{int(v[1:3], 16)},{int(v[3:5], 16)},{int(v[5:7], 16)}"
+
+    with open(KONSOLE_SCHEME, "r", encoding="utf-8") as f:
+        txt = f.read()
+
+    if "Background" in colors:
+        txt = re.sub(r"(\[Background\]\nColor=).*", rf"\g<1>{colors['Background']}", txt)
+    if "Foreground" in colors:
+        txt = re.sub(r"(\[Foreground\]\nColor=).*", rf"\g<1>{colors['Foreground']}", txt)
+    if opacity is not None:
+        txt = re.sub(r"^Opacity=.*$", f"Opacity={opacity:.2f}", txt, flags=re.MULTILINE)
+
+    with open(KONSOLE_SCHEME, "w", encoding="utf-8") as f:
+        f.write(txt)
+
+
+def apply_theme(slug: str) -> None:
+    if slug not in THEMES:
+        raise SystemExit(f"Unknown theme: {slug}")
+    cfg = THEMES[slug]
+    run(["plasma-apply-colorscheme", cfg["scheme"]])
+    run(["plasma-apply-colorscheme", "--accent-color", cfg["accent"]])
+
+    schema = ptyxis_profile_schema()
+    if schema:
+        run(["gsettings", "set", schema, "palette", cfg["ptyxis"]])
+
+    sync_konsole_from_palette(cfg["ptyxis"])
+    save_state({"theme": slug, "accent": cfg["accent"]})
+
+
+def apply_accent(hex_color: str) -> None:
+    hex_color = hex_color.strip()
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", hex_color):
+        raise SystemExit(f"Invalid hex color: {hex_color}")
+    hex_color = hex_color.lower()
+
+    run(["plasma-apply-colorscheme", "--accent-color", hex_color])
+
+    schema = ptyxis_profile_schema()
+    if schema:
+        pal_name = run(["gsettings", "get", schema, "palette"]).strip("'")
+        pal_path = os.path.join(PALETTE_DIR, f"{pal_name}.palette")
+        if os.path.exists(pal_path):
+            with open(pal_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            new_content = re.sub(r"^Cursor=.*$", f"Cursor={hex_color.upper()}", content, flags=re.MULTILINE)
+            with open(pal_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            run(["gsettings", "set", schema, "palette", pal_name])
+
+    save_state({"accent": hex_color})
+
+
+def apply_icons(theme_name: str) -> None:
+    tool = changeicons_bin()
+    if tool:
+        run([tool, theme_name])
+    else:
+        kwrite("kdeglobals", "Icons", "Theme", theme_name)
+    save_state({"icons": theme_name})
+
+
+def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int) -> None:
+    """Register or update glassdesk-kde-apps inside ~/.config/kwinrulesrc without duplicates."""
+    existing_raw = kread("kwinrulesrc", "General", "rules", "")
+    rules = [r.strip() for r in existing_raw.split(",") if r.strip()]
+    if "glassdesk-kde-apps" not in rules:
+        rules.append("glassdesk-kde-apps")
+    joined = ",".join(rules)
+    kwrite("kwinrulesrc", "General", "count", str(len(rules)))
+    kwrite("kwinrulesrc", "General", "rules", joined)
+    kwrite("kwinrulesrc", "General", "Order", joined)
+
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "Description", "GlassDesk - Aplicaciones nativas de KDE")
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", str(active_pct))
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityactiverule", "2")
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityinactive", str(inactive_pct))
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityinactiverule", "2")
+    kwrite(
+        "kwinrulesrc",
+        "glassdesk-kde-apps",
+        "wmclass",
+        r"(systemsettings|org\.kde\.dolphin|org\.kde\.kate|org\.kde\.konsole|org\.kde\.ark|org\.kde\.kcalc|org\.kde\.okular|org\.kde\.spectacle)",
+    )
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclasscomplete", "false")
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclassmatch", "3")
+
+
+def apply_transparency(mode: str) -> None:
+    if mode not in TRANSPARENCY_PROFILES:
+        raise SystemExit(f"Unknown transparency mode: {mode}")
+    p = TRANSPARENCY_PROFILES[mode]
+
+    schema = ptyxis_profile_schema()
+    if schema:
+        run(["gsettings", "set", schema, "opacity", str(p["ptyxis_opacity"])])
+
+    ensure_kwin_rule_entry(int(p["kde_active"]), int(p["kde_inactive"]))
+
+    for key, val in (
+        ("DolphinViewOpacity", p["dolphin_view"]),
+        ("DolphinSidebarOpacity", p["dolphin_sidebar"]),
+        ("MenuOpacity", p["menus"]),
+        ("MenuBarOpacity", p["bars"]),
+        ("ToolBarOpacity", p["bars"]),
+        ("TabBarOpacity", p["bars"]),
+    ):
+        kwrite("darklyrc", "Common", key, str(val))
+
+    sync_konsole_from_palette("", opacity=float(p["ptyxis_opacity"]))
+    run(["dbus-send", "--type=signal", "/DarklyStyle", "org.kde.Darkly.Style.reparseConfiguration"])
+    run([qdbus_bin(), "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"])
+    save_state({"transparency": mode})
+
+
+def resolve_video_pool(is_vertical: bool) -> tuple[list[str], int, bool]:
+    """Return (video_uris, fill_mode, fill_blur) based on monitor orientation and Vertical/ contents."""
+    if is_vertical:
+        vert = list_videos(vertical=True)
+        if vert:
+            return ["file://" + urllib.parse.quote(v) for v in vert], 2, False
+        horiz = list_videos(vertical=False)
+        return ["file://" + urllib.parse.quote(v) for v in horiz], 1, True
+    horiz = list_videos(vertical=False)
+    return ["file://" + urllib.parse.quote(v) for v in horiz], 2, False
+
+
+def resolve_static_pool(is_vertical: bool) -> tuple[list[str], int, bool]:
+    """Return (image_paths, fill_mode, blur_bg) based on monitor orientation and Vertical/ contents."""
+    if is_vertical:
+        vert = list_static_wallpapers(vertical=True)
+        if vert:
+            return vert, 2, False
+        return list_static_wallpapers(vertical=False), 1, True
+    return list_static_wallpapers(vertical=False), 2, False
+
+
+def apply_video_for_screen(
+    screen_id: int,
+    video_uri: str,
+    pool_uris: list[str],
+    fill_mode: int,
+    fill_blur: bool,
+    rotate_enabled: bool = False,
+    rotate_minutes: int = 5,
+) -> None:
+    target_list = pool_uris if rotate_enabled else [video_uri]
+    entries = [
+        {
+            "filename": u,
+            "enabled": True,
+            "duration": 0,
+            "customDuration": 0,
+            "playbackRate": 0.0,
+            "alternativePlaybackRate": 0.0,
+            "loop": not rotate_enabled,
+        }
+        for u in target_list
+    ]
+    video_urls_json = json.dumps(entries)
+    change_mode = 2 if rotate_enabled else 0
+    timer_min = max(1, rotate_minutes) if rotate_enabled else 0
+    random_js = "true" if rotate_enabled else "false"
+    crossfade_js = "true" if rotate_enabled else "false"
+
+    js = f"""
+var ds = desktops();
+var videoUrls = {json.dumps(video_urls_json)};
+for (var i = 0; i < ds.length; i++) {{
+    if (ds[i].screen !== {screen_id}) continue;
+    var d = ds[i];
+    d.wallpaperPlugin = "luisbocanegra.smart.video.wallpaper.reborn";
+    d.currentConfigGroup = ["Wallpaper", "luisbocanegra.smart.video.wallpaper.reborn", "General"];
+    d.writeConfig("VideoUrls", videoUrls);
+    d.writeConfig("ChangeWallpaperMode", {change_mode});
+    d.writeConfig("ChangeWallpaperTimerMinutes", {timer_min});
+    d.writeConfig("ChangeWallpaperTimerSeconds", 0);
+    d.writeConfig("ChangeWallpaperTimerHours", 0);
+    d.writeConfig("RandomMode", {random_js});
+    d.writeConfig("CrossfadeEnabled", {crossfade_js});
+    d.writeConfig("CrossfadeDuration", 1000);
+    d.writeConfig("PauseMode", 0);
+    d.writeConfig("MuteMode", 5);
+    d.writeConfig("BlurMode", 5);
+    d.writeConfig("FillMode", {fill_mode});
+    d.writeConfig("FillBlur", {"true" if fill_blur else "false"});
+    d.writeConfig("FillBlurRadius", 64);
+    d.writeConfig("ResumeLastVideo", true);
+    d.writeConfig("LastVideo", {json.dumps(video_uri)});
+}}
+"""
+    run([qdbus_bin(), "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", js])
+
+
+def apply_static_for_screen(
+    screen_id: int,
+    image_path: str,
+    fill_mode: int,
+    blur_bg: bool,
+    rotate_enabled: bool = False,
+    rotate_minutes: int = 5,
+    is_vertical: bool = False,
+) -> None:
+    if rotate_enabled:
+        if is_vertical and list_static_wallpapers(vertical=True):
+            slide_paths = [STATIC_VERT_DIR]
+        else:
+            slide_paths = sorted(
+                d for d in glob.glob(os.path.join(STATIC_DIR, "*"))
+                if os.path.isdir(d) and os.path.basename(d) != "Vertical"
+            ) or [STATIC_DIR]
+        interval_sec = max(1, rotate_minutes) * 60
+        js = f"""
+var ds = desktops();
+for (var i = 0; i < ds.length; i++) {{
+    if (ds[i].screen !== {screen_id}) continue;
+    var d = ds[i];
+    d.wallpaperPlugin = "org.kde.slideshow";
+    d.currentConfigGroup = ["Wallpaper", "org.kde.slideshow", "General"];
+    d.writeConfig("SlidePaths", {json.dumps(slide_paths)});
+    d.writeConfig("SlideInterval", {interval_sec});
+    d.writeConfig("SlideshowMode", 0);
+    d.writeConfig("FillMode", {fill_mode});
+    d.writeConfig("Blur", {"true" if blur_bg else "false"});
+}}
+"""
+    else:
+        uri = "file://" + urllib.parse.quote(image_path)
+        js = f"""
+var ds = desktops();
+for (var i = 0; i < ds.length; i++) {{
+    if (ds[i].screen !== {screen_id}) continue;
+    var d = ds[i];
+    d.wallpaperPlugin = "org.kde.image";
+    d.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
+    d.writeConfig("Image", {json.dumps(uri)});
+    d.writeConfig("FillMode", {fill_mode});
+    d.writeConfig("Blur", {"true" if blur_bg else "false"});
+}}
+"""
+    run([qdbus_bin(), "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", js])
+
+
+def set_video_wallpaper(target: str | None = None, delta: int = 0) -> None:
+    screens_all = query_screens()
+    target = target or target_monitor(screens_all)
+    screens = target_screens(screens_all, target)
+    state = load_state()
+    rot_on = bool(state.get("rotate_video_enabled", False))
+    rot_min = int(state.get("rotate_video_minutes", 5))
+    updates: dict[str, object] = {"wallpaper": "video"}
+
+    for sc in screens:
+        sid = int(sc["screen"])
+        is_vert = bool(sc["vertical"])
+        uris, fill_mode, fill_blur = resolve_video_pool(is_vert)
+        if not uris:
+            raise SystemExit(f"No videos found in {VIDEO_DIR}")
+
+        key = f"last_video_{sid}"
+        current = str(state.get(key, state.get("last_video", "")))
+        if current in uris:
+            idx = (uris.index(current) + delta) % len(uris)
+        else:
+            idx = 0 if delta >= 0 else len(uris) - 1
+
+        chosen = uris[idx]
+        apply_video_for_screen(sid, chosen, uris, fill_mode, fill_blur, rot_on, rot_min)
+        updates[key] = chosen
+        updates["last_video"] = chosen
+
+    save_state(updates)
+
+
+def set_static_wallpaper(target: str | None = None, delta: int = 0) -> None:
+    screens_all = query_screens()
+    target = target or target_monitor(screens_all)
+    screens = target_screens(screens_all, target)
+    state = load_state()
+    rot_on = bool(state.get("rotate_static_enabled", False))
+    rot_min = int(state.get("rotate_static_minutes", 5))
+    theme = str(detect_status()["theme"])
+    subdir = THEMES.get(theme, {}).get("wallpaper_subdir", "tokyo-night")
+    updates: dict[str, object] = {"wallpaper": "static"}
+
+    for sc in screens:
+        sid = int(sc["screen"])
+        is_vert = bool(sc["vertical"])
+        images, fill_mode, blur_bg = resolve_static_pool(is_vert)
+        if not images:
+            raise SystemExit(f"No static wallpapers found in {STATIC_DIR}")
+
+        key = f"last_static_{sid}"
+        current = str(state.get(key, state.get("last_static", "")))
+        if current in images:
+            idx = (images.index(current) + delta) % len(images)
+        else:
+            themed = [i for i, p in enumerate(images) if f"/{subdir}/" in p]
+            idx = themed[0] if themed else 0
+
+        chosen = images[idx]
+        apply_static_for_screen(sid, chosen, fill_mode, blur_bg, rot_on, rot_min, is_vert)
+        updates[key] = chosen
+        updates["last_static"] = chosen
+
+    save_state(updates)
+
+
+def set_rotation(enabled: bool, minutes: int | None = None) -> None:
+    status = detect_status()
+    mode = str(status["wallpaper"])
+    prefix = "rotate_video" if mode == "video" else "rotate_static"
+    updates: dict[str, object] = {f"{prefix}_enabled": enabled}
+    if minutes is not None:
+        updates[f"{prefix}_minutes"] = max(1, min(1440, minutes))
+    save_state(updates)
+    if mode == "video":
+        set_video_wallpaper(delta=0)
+    else:
+        set_static_wallpaper(delta=0)
+
+
+def step_wallpaper(delta: int) -> None:
+    status = detect_status()
+    if status["wallpaper"] == "video":
+        set_video_wallpaper(delta=delta)
+    else:
+        set_static_wallpaper(delta=delta)
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 2:
+        print("Usage: glassdesk <status|theme|accent|icons|transparency|monitor|wallpaper|rotation>", file=sys.stderr)
+        return 1
+
+    cmd = argv[1]
+    arg = argv[2] if len(argv) > 2 else ""
+
+    if cmd == "status":
+        print(json.dumps(detect_status()))
+    elif cmd == "theme":
+        apply_theme(arg)
+    elif cmd == "accent":
+        apply_accent(arg)
+    elif cmd == "icons":
+        apply_icons(arg)
+    elif cmd == "transparency":
+        apply_transparency(arg)
+    elif cmd == "monitor":
+        if arg != "all" and not arg.isdigit():
+            raise SystemExit(f"Unknown monitor target: {arg}")
+        save_state({"monitor": arg})
+    elif cmd == "rotation":
+        if arg not in ("on", "off"):
+            raise SystemExit(f"Unknown rotation flag: {arg}")
+        mins = int(argv[3]) if len(argv) > 3 else None
+        set_rotation(arg == "on", mins)
+    elif cmd == "wallpaper":
+        if arg == "video":
+            set_video_wallpaper(delta=0)
+        elif arg == "static":
+            set_static_wallpaper(delta=0)
+        elif arg == "next":
+            step_wallpaper(1)
+        elif arg == "prev":
+            step_wallpaper(-1)
+        else:
+            raise SystemExit(f"Unknown wallpaper action: {arg}")
+    else:
+        raise SystemExit(f"Unknown command: {cmd}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

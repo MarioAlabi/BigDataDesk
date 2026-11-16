@@ -1,0 +1,5 @@
+.cache/
+target/
+*.bak
+*.tmp
+__pycache__/
