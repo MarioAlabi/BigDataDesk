@@ -103,7 +103,7 @@ cp.read(path, encoding="utf-8")
 if cp.has_section("glassdesk-kde-apps"):
     cp.remove_section("glassdesk-kde-apps")
 if cp.has_section("General"):
-    raw = cp.get("General", "rules", fallback="")
+    raw = cp.get("General", "Order", fallback="") or cp.get("General", "rules", fallback="")
     rules = [r.strip() for r in raw.split(",") if r.strip() and r.strip() != "glassdesk-kde-apps"]
     cp.set("General", "count", str(len(rules)))
     cp.set("General", "rules", ",".join(rules))
@@ -426,7 +426,12 @@ PY
 
   if [ -x "$LOCAL_BIN/glassdesk-tray" ] && { [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; }; then
     log "Iniciando glassdesk-tray en segundo plano..."
-    nohup "$LOCAL_BIN/glassdesk-tray" </dev/null >/dev/null 2>&1 &
+    if command -v systemd-run >/dev/null 2>&1 && systemctl --user is-active default.target >/dev/null 2>&1; then
+      systemctl --user stop glassdesk-tray-live.service >/dev/null 2>&1 || true
+      systemd-run --user --quiet --collect --unit=glassdesk-tray-live "$LOCAL_BIN/glassdesk-tray"
+    else
+      nohup "$LOCAL_BIN/glassdesk-tray" </dev/null >/dev/null 2>&1 &
+    fi
   fi
 
   log "¡Instalación / actualización de BigDataDesk completada!"

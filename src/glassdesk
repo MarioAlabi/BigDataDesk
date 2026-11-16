@@ -407,8 +407,12 @@ def apply_icons(theme_name: str) -> None:
 
 def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int) -> None:
     """Register or update glassdesk-kde-apps inside ~/.config/kwinrulesrc without duplicates."""
-    existing_raw = kread("kwinrulesrc", "General", "rules", "")
-    rules = [r.strip() for r in existing_raw.split(",") if r.strip()]
+    existing_raw = kread("kwinrulesrc", "General", "Order", "") or kread("kwinrulesrc", "General", "rules", "")
+    rules: list[str] = []
+    for r in existing_raw.split(","):
+        r = r.strip()
+        if r and r not in rules:
+            rules.append(r)
     if "glassdesk-kde-apps" not in rules:
         rules.append("glassdesk-kde-apps")
     joined = ",".join(rules)
