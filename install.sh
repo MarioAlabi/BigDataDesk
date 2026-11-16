@@ -77,7 +77,7 @@ resolve_video_dir() {
 
 stop_running_services() {
   pkill -x glassdesk-tray 2>/dev/null || true
-  pkill -f "[g]lassdesk-popup" 2>/dev/null || true
+  pkill -f "/bin/glassdesk-popup$" 2>/dev/null || true
   rm -f "${XDG_RUNTIME_DIR:-/tmp}/glassdesk-tray.sock"
   sleep 0.2
 }
@@ -398,17 +398,20 @@ EOF
 
   # Preservar estado previo en actualizaciones o inicializar valores por defecto
   local cur_theme="ethereal"
-  local cur_transp="glass"
+  local cur_opacity="90"
+  local cur_blur="10"
   local cur_icons="Neonyt-Dark-Icons"
   if [ -f "$STATE_DIR/state.json" ]; then
     cur_theme="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("theme","ethereal"))' "$STATE_DIR/state.json" 2>/dev/null || echo ethereal)"
-    cur_transp="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("transparency","glass"))' "$STATE_DIR/state.json" 2>/dev/null || echo glass)"
+    cur_opacity="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); t=d.get("transparency","glass"); print(d.get("opacity", 100 if t=="reading" else 90))' "$STATE_DIR/state.json" 2>/dev/null || echo 90)"
+    cur_blur="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("blur",10))' "$STATE_DIR/state.json" 2>/dev/null || echo 10)"
     cur_icons="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("icons","Neonyt-Dark-Icons"))' "$STATE_DIR/state.json" 2>/dev/null || echo Neonyt-Dark-Icons)"
   fi
 
-  log "Aplicando estado activo (tema=$cur_theme, transparencia=$cur_transp)..."
+  log "Aplicando estado activo (tema=$cur_theme, opacidad=${cur_opacity}%, blur=$cur_blur)..."
   "$LOCAL_BIN/glassdesk" theme "$cur_theme" || true
-  "$LOCAL_BIN/glassdesk" transparency "$cur_transp" || true
+  "$LOCAL_BIN/glassdesk" opacity "$cur_opacity" || true
+  "$LOCAL_BIN/glassdesk" blur "$cur_blur" || true
   if [ -d "$HOME/.local/share/icons/$cur_icons" ]; then
     "$LOCAL_BIN/glassdesk" icons "$cur_icons" || true
   fi

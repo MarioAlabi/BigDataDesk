@@ -294,7 +294,8 @@ def detect_status() -> dict[str, object]:
     accent_csv = kread("kdeglobals", "General", "AccentColor", "")
     accent_hex = rgb_csv_to_hex(accent_csv, str(state.get("accent", default_accent)))
 
-    apps_active = int(kread("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", "90"))
+    apps_active = max(40, min(100, int(kread("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", "90"))))
+    blur_strength = max(1, min(15, int(kread("kwinrc", "Effect-better_blur_dx", "BlurStrength", "10"))))
     icons = kread("kdeglobals", "Icons", "Theme", "Neonyt-Dark-Icons")
     transparency_mode = "reading" if apps_active >= 100 else "glass"
 
@@ -317,6 +318,8 @@ def detect_status() -> dict[str, object]:
         "accent": accent_hex,
         "icons": icons,
         "transparency": transparency_mode,
+        "opacity": apps_active,
+        "blur": blur_strength,
         "wallpaper": wallpaper_mode,
         "monitor": monitor,
         "screen_count": len(screens),
@@ -435,10 +438,26 @@ def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int) -> None:
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclassmatch", "3")
 
 
-def apply_transparency(mode: str) -> None:
-    if mode not in TRANSPARENCY_PROFILES:
-        raise SystemExit(f"Unknown transparency mode: {mode}")
-    p = TRANSPARENCY_PROFILES[mode]
+def apply_opacity(pct: int) -> None:
+    """Apply custom opacity percentage (40..100) across KDE rules, Darkly, Ptyxis, and Konsole."""
+    pct = max(40, min(100, pct))
+    if pct >= 100:
+        p = TRANSPARENCY_PROFILES["reading"]
+        mode = "reading"
+    elif pct == 90:
+        p = TRANSPARENCY_PROFILES["glass"]
+        mode = "glass"
+    else:
+        p = {
+            "ptyxis_opacity": round(max(0.35, min(0.99, pct * 0.82 / 90.0)), 2),
+            "kde_active": pct,
+            "kde_inactive": max(35, pct - 6),
+            "dolphin_view": max(30, min(99, round(pct * 72 / 90.0))),
+            "dolphin_sidebar": max(25, min(98, round(pct * 56 / 90.0))),
+            "menus": max(35, min(99, round(pct * 74 / 90.0))),
+            "bars": max(30, min(98, round(pct * 62 / 90.0))),
+        }
+        mode = "glass"
 
     schema = ptyxis_profile_schema()
     if schema:
@@ -459,7 +478,23 @@ def apply_transparency(mode: str) -> None:
     sync_konsole_from_palette("", opacity=float(p["ptyxis_opacity"]))
     run(["dbus-send", "--type=signal", "/DarklyStyle", "org.kde.Darkly.Style.reparseConfiguration"])
     run([qdbus_bin(), "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"])
-    save_state({"transparency": mode})
+    save_state({"transparency": mode, "opacity": pct})
+
+
+def apply_blur(strength: int) -> None:
+    """Apply KWin Better Blur DX blur strength (1..15) and reload the effect immediately."""
+    strength = max(1, min(15, strength))
+    kwrite("kwinrc", "Plugins", "better_blur_dxEnabled", "true")
+    kwrite("kwinrc", "Plugins", "blurEnabled", "false")
+    kwrite("kwinrc", "Effect-better_blur_dx", "BlurStrength", str(strength))
+    run([qdbus_bin(), "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", "better_blur_dx"])
+    save_state({"blur": strength})
+
+
+def apply_transparency(mode: str) -> None:
+    if mode not in TRANSPARENCY_PROFILES:
+        raise SystemExit(f"Unknown transparency mode: {mode}")
+    apply_opacity(100 if mode == "reading" else 90)
 
 
 def resolve_video_pool(is_vertical: bool) -> tuple[list[str], int, bool]:
@@ -679,7 +714,7 @@ def step_wallpaper(delta: int) -> None:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("Usage: glassdesk <status|theme|accent|icons|transparency|monitor|wallpaper|rotation>", file=sys.stderr)
+        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|monitor|wallpaper|rotation>", file=sys.stderr)
         return 1
 
     cmd = argv[1]
@@ -695,6 +730,10 @@ def main(argv: list[str]) -> int:
         apply_icons(arg)
     elif cmd == "transparency":
         apply_transparency(arg)
+    elif cmd == "opacity":
+        apply_opacity(int(arg))
+    elif cmd == "blur":
+        apply_blur(int(arg))
     elif cmd == "monitor":
         if arg != "all" and not arg.isdigit():
             raise SystemExit(f"Unknown monitor target: {arg}")

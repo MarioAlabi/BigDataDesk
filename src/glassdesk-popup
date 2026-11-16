@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSlider,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -120,7 +121,7 @@ class QuickPopup(QWidget):
         rot_row.addWidget(self.rot_apply)
         root.addLayout(rot_row)
 
-        # Transparency quick toggle
+        # Transparency quick toggle + custom opacity & blur sliders
         tr_row = QHBoxLayout()
         tr_row.addWidget(QLabel("Estilo:"))
         self.tr_group = QButtonGroup(self)
@@ -134,7 +135,53 @@ class QuickPopup(QWidget):
             tr_row.addWidget(btn)
         root.addLayout(tr_row)
 
+        self._op_timer = QTimer(self)
+        self._op_timer.setSingleShot(True)
+        self._op_timer.setInterval(120)
+        self._op_timer.timeout.connect(lambda: self._exec("opacity", str(self.op_slider.value())))
+
+        op_row = QHBoxLayout()
+        op_lbl = QLabel("Opacidad:")
+        op_lbl.setMinimumWidth(78)
+        self.op_slider = QSlider(Qt.Orientation.Horizontal)
+        self.op_slider.setRange(40, 100)
+        self.op_slider.valueChanged.connect(self._on_opacity_changed)
+        self.op_val = QLabel("90%")
+        self.op_val.setMinimumWidth(38)
+        self.op_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        op_row.addWidget(op_lbl)
+        op_row.addWidget(self.op_slider)
+        op_row.addWidget(self.op_val)
+        root.addLayout(op_row)
+
+        self._blur_timer = QTimer(self)
+        self._blur_timer.setSingleShot(True)
+        self._blur_timer.setInterval(120)
+        self._blur_timer.timeout.connect(lambda: self._exec("blur", str(self.blur_slider.value())))
+
+        blur_row = QHBoxLayout()
+        blur_lbl = QLabel("Desenfoque:")
+        blur_lbl.setMinimumWidth(78)
+        self.blur_slider = QSlider(Qt.Orientation.Horizontal)
+        self.blur_slider.setRange(1, 15)
+        self.blur_slider.valueChanged.connect(self._on_blur_changed)
+        self.blur_val = QLabel("10/15")
+        self.blur_val.setMinimumWidth(38)
+        self.blur_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        blur_row.addWidget(blur_lbl)
+        blur_row.addWidget(self.blur_slider)
+        blur_row.addWidget(self.blur_val)
+        root.addLayout(blur_row)
+
         self._sync_ui()
+
+    def _on_opacity_changed(self, value: int) -> None:
+        self.op_val.setText(f"{value}%")
+        self._op_timer.start()
+
+    def _on_blur_changed(self, value: int) -> None:
+        self.blur_val.setText(f"{value}/15")
+        self._blur_timer.start()
 
     def _on_rot_toggled(self, checked: bool) -> None:
         self.rot_spin.setEnabled(checked)
@@ -189,6 +236,21 @@ class QuickPopup(QWidget):
         tr = str(st.get("transparency", "glass"))
         if tr in self.tr_btns:
             self.tr_btns[tr].setChecked(True)
+
+        op = max(40, min(100, int(st.get("opacity", 90))))
+        if not self.op_slider.isSliderDown():
+            self.op_slider.blockSignals(True)
+            self.op_slider.setValue(op)
+            self.op_slider.blockSignals(False)
+            self.op_val.setText(f"{op}%")
+
+        blur = max(1, min(15, int(st.get("blur", 10))))
+        if not self.blur_slider.isSliderDown():
+            self.blur_slider.blockSignals(True)
+            self.blur_slider.setValue(blur)
+            self.blur_slider.blockSignals(False)
+            self.blur_val.setText(f"{blur}/15")
+
         cur = str(st.get("current_file", "")).strip()
         self.file_label.setText(cur if cur else "—")
 
