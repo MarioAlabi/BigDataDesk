@@ -108,6 +108,15 @@ THEMES: dict[str, dict[str, str]] = {
     },
 }
 
+KDE_GLASS_WMCLASS_BASE = (
+    r"(systemsettings|org\.kde\.dolphin|org\.kde\.konsole|org\.kde\.ark|"
+    r"org\.kde\.kcalc|org\.kde\.spectacle)"
+)
+KDE_GLASS_WMCLASS_ALL = (
+    r"(systemsettings|org\.kde\.dolphin|org\.kde\.kate|org\.kde\.konsole|"
+    r"org\.kde\.ark|org\.kde\.kcalc|org\.kde\.okular|org\.kde\.spectacle)"
+)
+
 TRANSPARENCY_PROFILES: dict[str, dict[str, object]] = {
     "glass": {
         "ptyxis_opacity": 0.82,
@@ -295,11 +304,10 @@ def detect_status() -> dict[str, object]:
     accent_hex = rgb_csv_to_hex(accent_csv, str(state.get("accent", default_accent)))
 
     apps_active = max(40, min(100, int(kread("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", "90"))))
-    blur_strength = max(1, min(15, int(kread("kwinrc", "Effect-better_blur_dx", "BlurStrength", "10"))))
-    dim_cfg = kread("kwinrc", "Plugins", "diminactiveEnabled", "false").lower() == "true"
-    focus_on = bool(state.get("focus", dim_cfg))
-    ui_opacity = int(state.get("opacity", apps_active)) if focus_on else apps_active
-    ui_opacity = max(40, min(100, ui_opacity))
+    blur_strength = max(1, min(15, int(kread("kwinrc", "Effect-better_blur_dx", "BlurStrength", "12"))))
+    cur_wm = kread("kwinrulesrc", "glassdesk-kde-apps", "wmclass", KDE_GLASS_WMCLASS_BASE)
+    protect_text = bool(state.get("protect_text", "org.kde.kate" not in cur_wm and r"org\.kde\.kate" not in cur_wm))
+    ui_opacity = apps_active
     icons = kread("kdeglobals", "Icons", "Theme", "Neonyt-Dark-Icons")
     transparency_mode = "reading" if ui_opacity >= 100 else "glass"
 
@@ -324,7 +332,7 @@ def detect_status() -> dict[str, object]:
         "transparency": transparency_mode,
         "opacity": ui_opacity,
         "blur": blur_strength,
-        "focus": focus_on,
+        "protect_text": protect_text,
         "wallpaper": wallpaper_mode,
         "monitor": monitor,
         "screen_count": len(screens),
@@ -413,7 +421,7 @@ def apply_icons(theme_name: str) -> None:
     save_state({"icons": theme_name})
 
 
-def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int) -> None:
+def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int, protect_text: bool = True) -> None:
     """Register or update glassdesk-kde-apps inside ~/.config/kwinrulesrc without duplicates."""
     existing_raw = kread("kwinrulesrc", "General", "Order", "") or kread("kwinrulesrc", "General", "rules", "")
     rules: list[str] = []
@@ -428,17 +436,13 @@ def ensure_kwin_rule_entry(active_pct: int, inactive_pct: int) -> None:
     kwrite("kwinrulesrc", "General", "rules", joined)
     kwrite("kwinrulesrc", "General", "Order", joined)
 
+    wm_pattern = KDE_GLASS_WMCLASS_BASE if protect_text else KDE_GLASS_WMCLASS_ALL
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "Description", "GlassDesk - Aplicaciones nativas de KDE")
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityactive", str(active_pct))
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityactiverule", "2")
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityinactive", str(inactive_pct))
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "opacityinactiverule", "2")
-    kwrite(
-        "kwinrulesrc",
-        "glassdesk-kde-apps",
-        "wmclass",
-        r"(systemsettings|org\.kde\.dolphin|org\.kde\.kate|org\.kde\.konsole|org\.kde\.ark|org\.kde\.kcalc|org\.kde\.okular|org\.kde\.spectacle)",
-    )
+    kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclass", wm_pattern)
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclasscomplete", "false")
     kwrite("kwinrulesrc", "glassdesk-kde-apps", "wmclassmatch", "3")
 
@@ -447,7 +451,8 @@ def apply_opacity(pct: int) -> None:
     """Apply custom opacity percentage (40..100) across KDE rules, Darkly, Ptyxis, and Konsole."""
     pct = max(40, min(100, pct))
     state = load_state()
-    focus_on = bool(state.get("focus", kread("kwinrc", "Plugins", "diminactiveEnabled", "false").lower() == "true"))
+    cur_wm = kread("kwinrulesrc", "glassdesk-kde-apps", "wmclass", KDE_GLASS_WMCLASS_BASE)
+    protect_text = bool(state.get("protect_text", "org.kde.kate" not in cur_wm and r"org\.kde\.kate" not in cur_wm))
 
     if pct >= 100:
         p = dict(TRANSPARENCY_PROFILES["reading"])
@@ -467,16 +472,11 @@ def apply_opacity(pct: int) -> None:
         }
         mode = "glass"
 
-    # When Focus mode is enabled, keep active foreground text crisp (98%) while dimming/fading background windows
-    if focus_on and pct < 100:
-        p["kde_active"] = 98
-        p["kde_inactive"] = max(35, pct - 14)
-
     schema = ptyxis_profile_schema()
     if schema:
         run(["gsettings", "set", schema, "opacity", str(p["ptyxis_opacity"])])
 
-    ensure_kwin_rule_entry(int(p["kde_active"]), int(p["kde_inactive"]))
+    ensure_kwin_rule_entry(int(p["kde_active"]), int(p["kde_inactive"]), protect_text=protect_text)
 
     for key, val in (
         ("DolphinViewOpacity", p["dolphin_view"]),
@@ -491,37 +491,24 @@ def apply_opacity(pct: int) -> None:
     sync_konsole_from_palette("", opacity=float(p["ptyxis_opacity"]))
     run(["dbus-send", "--type=signal", "/DarklyStyle", "org.kde.Darkly.Style.reparseConfiguration"])
     run([qdbus_bin(), "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"])
-    save_state({"transparency": mode, "opacity": pct})
+    save_state({"transparency": mode, "opacity": pct, "protect_text": protect_text})
 
 
-def apply_focus(enabled: bool) -> None:
-    """Toggle Dim Inactive + crisp active foreground text for readable stacked windows."""
-    qb = qdbus_bin()
-    if enabled:
-        kwrite("kwinrc", "Effect-diminactive", "Strength", "38")
-        kwrite("kwinrc", "Effect-diminactive", "DimPanels", "false")
-        kwrite("kwinrc", "Effect-diminactive", "DimDesktop", "false")
-        kwrite("kwinrc", "Effect-diminactive", "DimKeepAbove", "false")
-        kwrite("kwinrc", "Effect-diminactive", "DimByGroup", "true")
-        kwrite("kwinrc", "Effect-diminactive", "DimFullScreen", "false")
-        kwrite("kwinrc", "Plugins", "diminactiveEnabled", "true")
-        run([qb, "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.loadEffect", "diminactive"])
-        run([qb, "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", "diminactive"])
-    else:
-        kwrite("kwinrc", "Plugins", "diminactiveEnabled", "false")
-        run([qb, "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.unloadEffect", "diminactive"])
-
-    state = save_state({"focus": enabled})
+def apply_protect_text(enabled: bool) -> None:
+    """Keep document/code readers (Kate, Okular) opaque while keeping terminals & Dolphin glassy."""
+    state = save_state({"protect_text": enabled})
     cur_opacity = int(state.get("opacity", 90))
     apply_opacity(cur_opacity)
 
 
 def apply_blur(strength: int) -> None:
-    """Apply KWin Better Blur DX blur strength (1..15) and reload the effect immediately."""
+    """Apply KWin Better Blur DX blur strength (1..15) and subtle frost grain, then reload immediately."""
     strength = max(1, min(15, strength))
+    noise = 4 if strength >= 14 else (3 if strength >= 12 else 2)
     kwrite("kwinrc", "Plugins", "better_blur_dxEnabled", "true")
     kwrite("kwinrc", "Plugins", "blurEnabled", "false")
     kwrite("kwinrc", "Effect-better_blur_dx", "BlurStrength", str(strength))
+    kwrite("kwinrc", "Effect-better_blur_dx", "NoiseStrength", str(noise))
     run([qdbus_bin(), "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.reconfigureEffect", "better_blur_dx"])
     save_state({"blur": strength})
 
@@ -533,10 +520,12 @@ def apply_transparency(mode: str) -> None:
 
 
 def apply_reset_visuals() -> None:
-    """Restore default crystal opacity (90%), blur strength (12), and readable focus mode."""
+    """Restore default crystal opacity (90%), blur strength (12), and Kate/Okular text protection."""
+    kwrite("kwinrc", "Plugins", "diminactiveEnabled", "false")
+    run([qdbus_bin(), "org.kde.KWin", "/Effects", "org.kde.kwin.Effects.unloadEffect", "diminactive"])
     apply_blur(12)
-    save_state({"opacity": 90})
-    apply_focus(True)
+    save_state({"protect_text": True, "opacity": 90})
+    apply_opacity(90)
 
 
 def resolve_video_pool(is_vertical: bool) -> tuple[list[str], int, bool]:
@@ -756,7 +745,7 @@ def step_wallpaper(delta: int) -> None:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|focus|reset|monitor|wallpaper|rotation>", file=sys.stderr)
+        print("Usage: glassdesk <status|theme|accent|icons|transparency|opacity|blur|protect-text|reset|monitor|wallpaper|rotation>", file=sys.stderr)
         return 1
 
     cmd = argv[1]
@@ -776,10 +765,10 @@ def main(argv: list[str]) -> int:
         apply_opacity(int(arg))
     elif cmd == "blur":
         apply_blur(int(arg))
-    elif cmd == "focus":
+    elif cmd == "protect-text":
         if arg not in ("on", "off"):
-            raise SystemExit(f"Unknown focus flag: {arg}")
-        apply_focus(arg == "on")
+            raise SystemExit(f"Unknown protect-text flag: {arg}")
+        apply_protect_text(arg == "on")
     elif cmd == "reset":
         apply_reset_visuals()
     elif cmd == "monitor":
